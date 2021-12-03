@@ -26,7 +26,7 @@ def run_tests():
 if __name__ == "__main__":
     run_tests()
 
-    input = read_inputs(1)
+    input = read_inputs(x)
 
     # result_1 = run_1(input)
     # print(f"Finished 1 with result {result_1}")
