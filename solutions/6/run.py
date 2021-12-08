@@ -40,11 +40,11 @@ def run_tests():
 
     result_1 = run_1(test_inputs)
     if result_1 != 5934:
-        raise Exception(f"Test 1 did not past, got {result_1}")
+        raise Exception(f"Test 1 did not pass, got {result_1}")
 
     result_2 = run_2(test_inputs)
     if result_2 != 26984457539:
-        raise Exception(f"Test 2 did not past, got {result_2}")
+        raise Exception(f"Test 2 did not pass, got {result_2}")
 
 
 if __name__ == "__main__":
