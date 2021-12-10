@@ -30,7 +30,8 @@ RIGHT_TO_LEFT = {v: k for k, v in LEFT_TO_RIGHT.items()}
 def run_1(inputs):
     scores = []
     for line in inputs:
-        error = _find_syntax_error(line.strip())
+        # error = _find_syntax_error(line.strip())
+        _, error = _find_completion(line.strip())
         if error is not None:
             scores.append(SCORES[error])
     return sum(scores)
@@ -39,17 +40,23 @@ def run_1(inputs):
 def run_2(inputs):
     scores = []
     for line in inputs:
-        if _find_syntax_error(line.strip()) is not None:
+        completion, error = _find_completion(line.strip())
+        if error is not None:
             continue
-        completion = _find_completion(line.strip())
         score = _score_completion(completion)
         print(f'{line.strip()} score {score}')
         scores.append(score)
+    # Hacky way of finding median, always odd length
     return sorted(scores)[int(len(scores) / 2 - 0.5)]
 
 
-def _find_syntax_error(line):
+def _find_completion(line):
+    """
+    Returns tuple of (completion characters (list<string>), error character (string))
+    """
     stack = deque()
+
+    # Find first syntax error and return if found
     for c in line:
         if c in LEFT_TO_RIGHT:
             stack.append(c)
@@ -57,21 +64,9 @@ def _find_syntax_error(line):
             val = stack.pop()
             if val != RIGHT_TO_LEFT[c]:
                 print(f'expected {LEFT_TO_RIGHT[val]} got {c}')
-                return c
-    print(f'No error for line {line}')
-    return None
+                return None, c
 
-
-def _find_completion(line):
-    stack = deque()
-    for c in line:
-        if c in LEFT_TO_RIGHT:
-            stack.append(c)
-        else:
-            if not stack:
-                import pdb; pdb.set_trace()
-            val = stack.pop()
-
+    # Find any characters required for completion
     result = []
     while stack:
         val = stack.pop()
@@ -79,7 +74,7 @@ def _find_completion(line):
             result.append(LEFT_TO_RIGHT[val])
         else:
             stack.append(val)
-    return result
+    return result, None
 
 
 def _score_completion(completion):
@@ -103,11 +98,6 @@ def run_tests():
     <{([([[(<>()){}]>(<<{{
     <{([{{}}[<[[[<>{}]]]>[]]
     """.strip().split('\n')
-
-    _find_syntax_error('()')
-    _find_syntax_error('(((()))')
-    _find_syntax_error('()[]')
-    _find_syntax_error('(]')
 
     result_1 = run_1(test_inputs)
     if result_1 != 26397:
