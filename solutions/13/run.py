@@ -54,7 +54,7 @@ def _print_grid(points):
             if (x, y) in points:
                 print('\033[1;31m' + 'X', end=' ')
             else:
-                print("\033[0;0m" + '.', end=' ')
+                print("\033[0;0m" + ' ', end=' ')
         print()
 
 
