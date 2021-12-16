@@ -1,3 +1,6 @@
+from collections import defaultdict
+import heapq
+
 from solutions.get_inputs import read_inputs
 
 
@@ -5,174 +8,85 @@ def run_1(inputs):
     points = _parse_inputs(inputs)
     max_x = len(inputs[0]) - 1
     max_y = len(inputs) - 1
-    # _print_grid(points, max_x, max_y)
     return _find_best_path(points, (0, 0), max_x, max_y)
 
 
 def run_2(inputs):
-    pass
-
-# def _find_best_path(points,
-#                     curr_point,
-#                     max_x,
-#                     max_y):
-#     queue = {curr_point,}
-#     cache = {}
-#     import pdb; pdb.set_trace()
-#     while queue:
-#         x, y = queue.pop()
-#         if (x,y) in cache:
-#             continue
-#         nexts = [
-#             (x + 1, y),
-#             (x, y + 1),
-#             (x - 1, y),
-#             (x, y - 1),
-#         ]
-#         min_value = None
-#         for next_x, next_y in nexts:
-#             if (next_x, next_y) in cache:
-#                 if min_value is None or points[(next_x, next_y)] + cache[(next_x, next_y)] < min_value:
-#                     min_value = points[(next_x, next_y)] + cache[(next_x, next_y)]
-#                 continue
-#             if next_x < 0 or next_x > max_x or next_y < 0 or next_y > max_y:
-#                 continue
-#             elif next_x == max_x and next_y == max_y:
-#                 import pdb; pdb.set_trace()
-#                 cache[(next_x, next_y)] = points[(next_x, next_y)]
-#                 continue
-#             else:
-#                 # queue.append((next_x, next_y))
-#                 queue.add((next_x, next_y))
-#     return cache[curr_point]
-
-# def _find_best_path(points,
-#                     curr_point,
-#                     max_x,
-#                     max_y):
-#     cache = {(max_x, max_y): points[(max_x, max_y)]}
-#     i = 0
-#     while (0,0) not in cache:
-#         for x in range(max_x + 1):
-#             for y in range(max_y + 1):
-#                 nexts = [
-#                     (x + 1, y),
-#                     (x, y + 1),
-#                     (x - 1, y),
-#                     (x, y - 1),
-#                 ]
-#                 results = []
-#                 for next_x, next_y in nexts:
-#                     if (next_x, next_y) in cache:
-#                         results.append(cache[(next_x, next_y)] + points[(x,y)])
-#                     elif next_x < 0 or next_x > max_x or next_y < 0 or next_y > max_y:
-#                         continue
-#                 if results:
-#                     cache[(x, y)] = min(results)
-#         # import pdb; pdb.set_trace()
-#         i += 1
-#         print(cache)
-#         if len(points) > 100 and i < 5:
-#             import pdb; pdb.set_trace()
-#     return cache[(0,0)] - points[(0,0)]
+    orig_points = _parse_inputs(inputs)
+    points = _explode_points(orig_points, len(inputs))
+    max_x = max(p[0] for p in points)
+    max_y = max(p[1] for p in points)
+    return _find_best_path(points, (0, 0), max_x, max_y)
 
 
-def _find_best_path(points,
-                    curr_point,
-                    max_x,
-                    max_y,
-                    path=None,
-                    cache=None,
-                    seen_paths=None):
-    # print(f'path {path}')
-    if path is None:
-        # path = set()
-        path = []
-    if cache is None:
-        cache = {}
-    # if seen_paths = None:
-    #     seen_paths = set()
-    curr_x, curr_y = curr_point
-    # print(curr_x, curr_y)
-    # if curr_x==8 and curr_y == 8:
-    #     import pdb; pdb.set_trace()
-    # if curr_x==9 and curr_y == 8:
-    #     import pdb; pdb.set_trace()
-    # path.add((curr_x,curr_y))
-    # if len(path) > 40:
-    #     return None
-    path.append((curr_x,curr_y))
-    nexts = [
-        (curr_x + 1, curr_y),
-        (curr_x, curr_y + 1),
-    ]
-    # if _is_up_eligible(path):
-    #     nexts.append((curr_x, curr_y - 1))
-    # else:
-    #     import pdb; pdb.set_trace()
-    # if _is_left_eligible(path):
-    #     nexts.append((curr_x - 1, curr_y))
+def _explode_points(orig_points, size):
+    result = {}
 
-    min_point = None
-    min_value = None
-    # print(path)
-    # print(cache)
-    # _print_grid(points, max_x, max_y, path)
-    # print()
-    # import pdb; pdb.set_trace()
-    # if curr_y == 9:
-    #     import pdb; pdb.set_trace()
-    for x, y in nexts:
-        # print(curr_x, curr_y, nexts)
-        if (x, y) in path:
-            continue
-        if (x, y) in cache:
-            # print(path)
-            if min_value is None or cache[(x,y)] < min_value:
-                # min_value = cache[(x,y)]
-                min_value = cache[(x,y)] + points[(x,y)]
-                min_point = (x,y)
-            # results.append(cache[(x,y)])
-            continue
-        if x == max_x and y == max_y:
-            # import pdb; pdb.set_trace()
-            print(path)
+    for (x, y), val in orig_points.items():
+        for i in range(0, 5):
+            for j in range(0, 5):
+                new_point = (x+i*size, y+j*size)
+                new_val = int((val + i + j) % 9)
+                if new_val == 0:
+                    new_val = 9
+                result[new_point] = new_val
+    return result
+
+
+def _find_best_path(points, curr_point, max_x, max_y):
+    """
+    Implementation of Dijkstra's algorithm with help from
+    https://medium.com/basecs/finding-the-shortest-path-with-a-little-help-from-dijkstra-613149fbdc8e
+    """
+
+    open_set = [(0,0)]
+
+    came_from = {}
+
+    g_score = defaultdict(lambda: 1000000)
+    g_score[(0,0)] = 0
+
+    visited = set()
+
+    while open_set:
+        open_set.sort(key=lambda x: g_score[x])
+        current = open_set.pop(0)
+        visited.add(current)
+        if current[0] == max_x and current[1] == max_y:
+            score, path = _score_path(came_from, current, points)
             _print_grid(points, max_x, max_y, path)
-            return points[(x, y)]
-        elif x < 0 or x > max_x or y < 0 or y > max_y:
-            continue
-        else:
-            new_path = [i for i in path]
-            best = _find_best_path(points, (x,y), max_x, max_y, cache=cache, path=new_path)
-            if best is None:
+            return score
+        x,y = current
+        nexts = [
+            (x + 1, y),
+            (x, y + 1),
+            (x - 1, y),
+            (x, y - 1),
+        ]
+        for neighbor in nexts:
+            if neighbor in visited:
                 continue
-            from_here = best + points[(x,y)]
-            # if max_x - x < 5 and max_y - y < 5:
-            #     print(f'best from ({x}, {y}) is {best}')
-            cache[(x,y)] = from_here
-            if min_value is None or from_here < min_value:
-                min_value = from_here
-                min_point = (x,y)
-            # results.append(from_here)
-    # print(f'From {curr_point} found results {results}')
-    # return min(results)
-    # path.add(min_point)
-    # if min_value is None:
-        # import pdb; pdb.set_trace()
+            if neighbor[0] < 0 or neighbor[0] > max_x or neighbor[1] < 0 or neighbor[1] > max_y:
+                continue
+            tentative_g_score = g_score[current] + points[neighbor]
+            if tentative_g_score < g_score[neighbor]:
+                came_from[neighbor] = current
+                g_score[neighbor] = tentative_g_score
+                if neighbor not in open_set:
+                    open_set.append(neighbor)
 
-    return min_value
+    raise Exception("not found")
 
 
-def _is_up_eligible(path):
-    if len(path) < 2:
-        return True
-    return path[-1][1] >= path[-2][1]
+def _score_path(came_from, current, points):
+    total = 0
+    path = []
+    while current in came_from:
+        total += points[current]
+        current = came_from[current]
+        path.append(current)
 
-
-def _is_left_eligible(path):
-    if len(path) < 2:
-        return True
-    return path[-1][0] >= path[-2][0]
+    return total, path
 
 
 def _parse_inputs(inputs):
@@ -213,19 +127,17 @@ def run_tests():
     if result_1 != 40:
         raise Exception(f"Test 1 did not pass, got {result_1}")
 
-    # result_2 = run_2(test_inputs)
-    # if result_2 != 0:
-    #     raise Exception(f"Test 2 did not pass, got {result_2}")
+    result_2 = run_2(test_inputs)
+    if result_2 != 315:
+        raise Exception(f"Test 2 did not pass, got {result_2}")
 
 
 if __name__ == "__main__":
     run_tests()
 
     input = read_inputs(15)
-    #
-    # result_1 = run_1(input)
-    # print(f"Finished 1 with result {result_1}")
-    # 394 is too high
+    result_1 = run_1(input)
+    print(f"Finished 1 with result {result_1}")
 
-    # result_2 = run_2(input)
-    # print(f"Finished 2 with result {result_2}")
+    result_2 = run_2(input)
+    print(f"Finished 2 with result {result_2}")
