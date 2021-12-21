@@ -22,7 +22,7 @@ def run_2(inputs):
         print(i)
         grid = _iterate(grid, algo)
         grid = _trim_grid(grid)
-    _print_grid(grid)
+    w_print_grid(grid)
     return sum([i == '#' for i in grid.values()])
 
 
