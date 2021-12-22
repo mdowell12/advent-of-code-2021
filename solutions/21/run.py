@@ -39,164 +39,57 @@ def run_1(inputs):
 def run_2(inputs):
     p1_x, p2_x = _parse_input(inputs)
 
-    position_to_score_to_count_p1 = defaultdict(lambda: defaultdict(lambda: 0))
-    position_to_score_to_count_p1[p1_x][0] = 1
-
-    position_to_score_to_count_p2 = defaultdict(lambda: defaultdict(lambda: 0))
-    position_to_score_to_count_p2[p2_x][0] = 1
+    position_to_score_to_count = defaultdict(lambda: defaultdict(lambda: 0))
+    position_to_score_to_count[f'{p1_x},{p2_x}']['0,0'] = 1
 
     p1_win_count = 0
     p2_win_count = 0
     is_p1_turn = True
-    i = 0
-    while position_to_score_to_count_p1 and position_to_score_to_count_p2:
-        i += 1
-        print(i, p1_win_count, p2_win_count, len(position_to_score_to_count_p1), len(position_to_score_to_count_p2))
-        # print(sum([j for i in position_to_score_to_count_p1.values() for j in i.values()]))
-        # print(sum([j for i in position_to_score_to_count_p2.values() for j in i.values()]))
-        print(max([j for i in position_to_score_to_count_p1.values() for j in i.keys()]))
-        print(max([j for i in position_to_score_to_count_p2.values() for j in i.keys()]))
-        if is_p1_turn:
-            # new_dict = defaultdict(lambda: defaultdict(lambda: 0))
-            # for position, score_to_count in position_to_score_to_count_p1.items():
-            #     for score, count in score_to_count.items():
-            #         for roll in range(3, 10):
-            #             num_new_universes = roll_to_num_universes[roll]
-            #             new_x = _get_next_position(position, roll)
-            #             new_score = score + new_x
-            #             if new_score >= 21:
-            #                 p1_win_counter += num_new_universes
-            #             else:
-            #                 new_dict[new_x][new_score] += num_new_universes
-            #
-            #
-            # position_to_score_to_count_p1 = new_dict
-            new_dict, num_new_wins = _play_turn(position_to_score_to_count_p1)
-            position_to_score_to_count_p1 = new_dict
-            p1_win_count += num_new_wins
-        else:
-            new_dict, num_new_wins = _play_turn(position_to_score_to_count_p2)
-            position_to_score_to_count_p2 = new_dict
-            p2_win_count += num_new_wins
 
+    while position_to_score_to_count:
+        print(p1_win_count, p2_win_count)
+        new_dict, new_p1_wins, new_p2_wins = _play_turn(position_to_score_to_count, is_p1_turn)
+        position_to_score_to_count = new_dict
+        p1_win_count += new_p1_wins
+        p2_win_count += new_p2_wins
         is_p1_turn = False if is_p1_turn else True
-        # import pdb; pdb.set_trace()
+
     return max(p1_win_count, p2_win_count)
 
 
-def _play_turn(position_to_score_to_count):
-    # import pdb; pdb.set_trace()
-    num_new_wins = 0
+def _play_turn(position_to_score_to_count,
+               is_p1_turn):
+    p1_num_new_wins = 0
+    p2_num_new_wins = 0
     new_dict = defaultdict(lambda: defaultdict(lambda: 0))
     for position, score_to_count in position_to_score_to_count.items():
         for score, count in score_to_count.items():
-            # for roll in range(3, 10):
-                for i in range(3):
-                    for j in range(3):
-                        for k in range(3):
-                            roll = i + j + k
-                            # num_new_universes = roll_to_num_universes[roll]
-                            new_x = _get_next_position(position, roll)
-                            new_score = score + new_x
-                            # num_universes = count + num_new_universes * count
-                            num_universes = count
+            p1_x, p2_x = map(int, position.split(','))
+            p1_score, p2_score = map(int, score.split(','))
+            for i in range(1,4):
+                for j in range(1,4):
+                    for k in range(1,4):
+                        roll = i + j + k
+                        num_universes = count
+                        if is_p1_turn:
+                            new_x = _get_next_position(p1_x, roll)
+                            new_score = p1_score + new_x
                             if new_score >= 21:
-                                num_new_wins += num_universes
+                                p1_num_new_wins += num_universes
                             else:
-                                new_dict[new_x][new_score] += num_universes
-    return new_dict, num_new_wins
-
-
-# def run_2(inputs):
-#     p1_x, p2_x = _parse_input(inputs)
-#     p1_won, p2_won = False, False
-#
-#     # p1_x, p1_score, p2_x, p2_score, is_p1_turn
-#     first_game = (p1_x, 0, p2_x, 0, True)
-#
-#     # universes = 1
-#
-#     games = [first_game]
-#     p1_win_counter = 0
-#     p2_win_counter = 0
-#     while games:
-#         new_games = []
-#         for game in games:
-#             p1_x, p1_score, p2_x, p2_score, is_p1_turn = game
-#             for roll in range(3, 10):
-#                 num_new_universes = roll_to_num_universes[roll]
-#                 # universes += num_new_universes
-#                 p1_x, p1_score, p2_x, p2_score, is_p1_turn = game
-#                 if is_p1_turn:
-#                     p1_x = _get_next_position(p1_x, roll)
-#                     p1_score += p1_x
-#                     if p1_score >= 21:
-#                         p1_win_counter += 1
-#                     else:
-#                         new_games += [(p1_x, p1_score, p2_x, p2_score, False)] * num_new_universes
-#                 else:
-#                     p2_x = _get_next_position(p2_x, roll)
-#                     p2_score += p2_x
-#                     if p2_score >= 21:
-#                         p2_win_counter += 1
-#                     else:
-#                         new_games += [(p1_x, p1_score, p2_x, p2_score, True)] * num_new_universes
-#         games = new_games
-#         print(p1_win_counter, p2_win_counter, len(games))
-#     return max(p1_win_count, p2_win_counter)
-
-
-# def run_2(inputs):
-#     p1_x, p2_x = _parse_input(inputs)
-#     p1_won, p2_won = False, False
-#
-#     # p1_x, p1_score, p2_x, p2_score, is_p1_turn
-#     first_game = (p1_x, 0, p2_x, 0, True)
-#
-#     universes = 1
-#
-#     games = [first_game]
-#     p1_win_counter = 0
-#     p2_win_counter = 0
-#     while games:
-#         new_games = []
-#         for game in games:
-#             p1_x, p1_score, p2_x, p2_score, is_p1_turn = game
-#             for roll_1 in range(1, 4):
-#                 universes += 1
-#                 for roll_2 in range(1, 4):
-#                     universes += 1
-#                     for roll_3 in range(1, 4):
-#                         universes += 1
-#                         p1_x, p1_score, p2_x, p2_score, is_p1_turn = game
-#                         roll = roll_1 + roll_2 + roll_3
-#                         if is_p1_turn:
-#                             p1_x = _get_next_position(p1_x, roll)
-#                             p1_score += p1_x
-#                             if p1_score >= 21:
-#                                 # p1_won = True
-#                                 p1_win_counter += 1
-#                             else:
-#                                 new_games.append((p1_x, p1_score, p2_x, p2_score, False))
-#                         else:
-#                             p2_x = _get_next_position(p2_x, roll)
-#                             p2_score += p2_x
-#                             if p2_score >= 21:
-#                                 # p2_won = True
-#                                 p2_win_counter += 1
-#                             else:
-#                                 new_games.append((p1_x, p1_score, p2_x, p2_score, True))
-#                         # if p1_won and p2_won:
-#                         #     # return universes + len(new_games)
-#                         #     return universes
-#         games = new_games
-#         # universes *= len(games)
-#         # max_1 = max(g[1] for g in games)
-#         # max_2 = max(g[3] for g in games)
-#         # print(f'{len(games)} universes max_1={max_1} max_2={max_2}')
-#         # print(f'{universes} universes max_1={max_1} max_2={max_2}')
-#         print(universes)
-#     return max(p1_win_counter, p2_win_counter)
+                                new_position = f'{new_x},{p2_x}'
+                                score_s = f'{new_score},{p2_score}'
+                                new_dict[new_position][score_s] += num_universes
+                        else:
+                            new_x = _get_next_position(p2_x, roll)
+                            new_score = p2_score + new_x
+                            if new_score >= 21:
+                                p2_num_new_wins += num_universes
+                            else:
+                                new_position = f'{p1_x},{new_x}'
+                                score_s = f'{p1_score},{new_score}'
+                                new_dict[new_position][score_s] += num_universes
+    return new_dict, p1_num_new_wins, p2_num_new_wins
 
 
 def _get_next_position(current_x, roll, board_size=10):
