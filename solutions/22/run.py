@@ -4,17 +4,15 @@ from time import time
 from solutions.get_inputs import read_inputs
 
 
-# def run_1(inputs):
-#     commands = [_parse_line(line) for line in inputs]
-#     # print('\n'.join(str(l) for l in commands))
-#     # grid = defaultdict(lambda: False)
-#     grid = {}
-#     for command in commands:
-#         grid = _do_command(command, grid)
-#         # print(sorted(k for k,v in grid.items() if v))
-#         print(f'{command} {sum(int(i) for i in grid.values())}')
-#         # import pdb; pdb.set_trace()
-#     return sum(int(i) for i in grid.values())
+debug = True
+
+
+def run_1b(inputs):
+    commands = [_parse_line(line) for line in inputs]
+    grid = {}
+    for command in commands:
+        grid = _do_command(command, grid)
+    return sum(int(i) for i in grid.values())
 
 def run_1(inputs):
     commands = [_parse_line(line) for line in inputs]
@@ -26,33 +24,56 @@ def run_2(inputs):
     commands = [_parse_line(line) for line in inputs]
     return _run(commands)
 
+def _get_points_for_interval(values):
+    values = sorted(set(values))
+    result = values
+    result.append(result[-1]+1)
+    # TODO get this fucker right
+    # result = [values[0]]
+    # for value in values[1:]:
+    #     result.append(value)
+    #     result.append(value+1)
+    # result = sorted(set(values))
+    return result
 
 def _run(commands):
     x_values = []
     y_values = []
     for is_on, (x1, x2), (y1, y2), (z1, z2) in commands:
-        # Does this double count the borders?
-        # Saw an interval (6,6), should we include something like this?
         x_values.append(x1)
         x_values.append(x2)
         y_values.append(y1)
         y_values.append(y2)
-    x_values = sorted(set(x_values))
-    x_values.append(x_values[-1] + 1)
-    y_values = sorted(set(y_values))
-    y_values.append(y_values[-1] + 1)
+    # x_values = sorted(set(x_values))
+    # x_values.append(x_values[-1] + 1)
+    x_values = _get_points_for_interval(x_values)
+    # y_values = sorted(set(y_values))
+    # y_values.append(y_values[-1] + 1)
+    y_values = _get_points_for_interval(y_values)
+    import pdb; pdb.set_trace()
 
     cuboids = []
-    import pdb; pdb.set_trace()
+    # import pdb; pdb.set_trace()
     for i in range(len(x_values) - 1):
         for j in range(len(y_values) - 1):
             x1, x2 = x_values[i], x_values[i+1] - 1
             y1, y2 = y_values[j], y_values[j+1] - 1
-            print(f'{x1}..{x2} {y1}..{y2}')
+            # x1, x2 = x_values[i]+1, x_values[i+1]
+            # y1, y2 = y_values[j]+1, y_values[j+1]
+            if debug: print(f'{x1}..{x2} {y1}..{y2}')
+            # if (33,33,23,23) == (x1, x2, y1, y2):
+            #     import pdb; pdb.set_trace()
             assert x1 <= x2
             assert y1 <= y2
-            cuboids_this_slice = _get_cuboids_for_slice(x1, x2, y1, y2, commands)
-            cuboids += cuboids_this_slice
+            overlapping_commands = [c for c in commands if _is_valid_slice_for_command(x1,x2,y1,y2, c)]
+            if _is_valid_slice(x1, x2, y1, y2, commands):
+                # cuboids_this_slice = _get_cuboids_for_slice(x1, x2, y1, y2, commands)
+                cuboids_this_slice = _get_cuboids_for_slice(x1, x2, y1, y2, overlapping_commands)
+                cuboids += cuboids_this_slice
+                if debug: print(f'cuboids {cuboids}')
+            else:
+                if debug: print(f'skipped slice {x1, x2, y1, y2}')
+            # import pdb; pdb.set_trace()
 
     return sum(c.size() for c in cuboids)
 
@@ -70,7 +91,6 @@ sum list
 """
 
 def _get_cuboids_for_slice(slice_x1, slice_x2, slice_y1, slice_y2, commands):
-    debug = False
 
     intervals = []
     if debug: print(f"cuboids for slice {slice_x1, slice_x2, slice_y1, slice_y2}")
@@ -79,7 +99,7 @@ def _get_cuboids_for_slice(slice_x1, slice_x2, slice_y1, slice_y2, commands):
         if debug: print(f'\tcommand: {is_on, (x1, x2), (y1, y2), (z1, z2)} and intervals: {intervals}')
 
         if not (_does_overlap((slice_x1, slice_x2), (x1, x2)) and _does_overlap((slice_y1, slice_y2), (y1, y2))):
-            if debug: print(f'\tno overlap for {x1}..{x1} {y1}..{y2}')
+            if debug: print(f'\tno overlap for {x1}..{x2} {y1}..{y2}')
             continue
 
         if not is_on:
@@ -106,27 +126,26 @@ def _get_cuboids_for_slice(slice_x1, slice_x2, slice_y1, slice_y2, commands):
             continue
 
         if len(intervals) == 1:
-            # import pdb; pdb.set_trace()
             if _does_overlap(intervals[0], (z1, z2)):
                 if is_on:
-                    intervals[0][1] = max(intervals[0][1], z2)
+                    intervals[0] = _turn_on(intervals[0], z1, z2)
                     if debug: print(f'\tON interval {z1}..{z2} overlapped. Intervals now: {intervals}')
                 else:
-                    intervals[0][1] = z1 - 1
-                    new_intervals = _turn_off(intervals[0], None, z1, z2)
-                    intervals[0] = new_intervals[0]
-                    if len(new_intervals) > 1:
-                        intervals.append(new_intervals[1])
-                    if debug: print(f'\tOFF interval {z1}..{z2} overlapped. Intervals now: {intervals}')
+                    raise Exception()
+                    # intervals[0][1] = z1 - 1
+                    # new_intervals = _turn_off(intervals[0], None, z1, z2)
+                    # intervals[0] = new_intervals[0]
+                    # if len(new_intervals) > 1:
+                    #     intervals.append(new_intervals[1])
+                    # if debug: print(f'\tOFF interval {z1}..{z2} overlapped. Intervals now: {intervals}')
             else:
                 if is_on:
                     intervals.append([z1,z2])
-                    if debug: print(f'\ON interval {z1}..{z2} did not overlap. Intervals now: {intervals}')
+                    if debug: print(f'\tON interval {z1}..{z2} did not overlap. Intervals now: {intervals}')
                 else:
-                    if debug: print(f'\tOFF interval {z1}..{z2} did not overlap. Skipped. Intervals now: {intervals}')
-            # print(slice_x1, slice_x2, slice_y1, slice_y2, intervals)
+                    raise Exception()
+                    # if debug: print(f'\tOFF interval {z1}..{z2} did not overlap. Skipped. Intervals now: {intervals}')
             continue
-        # import pdb; pdb.set_trace()
 
         for i in range(len(intervals) - 1):
             left = intervals[i]
@@ -134,37 +153,47 @@ def _get_cuboids_for_slice(slice_x1, slice_x2, slice_y1, slice_y2, commands):
 
             if _does_overlap(left, (z1, z2)):
                 if _does_overlap((z1, z2), right):
+                    # import pdb; pdb.set_trace()
                     if is_on:
                         # stitch together
-                        left[1] = right[0] - 1
-                        if debug: print(f'\ON interval {z1}..{z2} overlapped with {left} and {right}. Intervals now: {intervals}')
+                        new = _turn_on(left, z1, z2)
+                        new = _turn_on(right, new[0], new[1])
+                        intervals[i] = new
+                        del intervals[i+1]
+                        if debug: print(f'\tON interval {z1}..{z2} overlapped with {left} and {right}. Intervals now: {intervals}')
                     else:
-                        left[1] = z1 - 1
-                        right[0] = z2 + 1
-                        if debug: print(f'\OFF interval {z1}..{z2} overlapped with {left} and {right}. Intervals now: {intervals}')
+                        raise Exception()
+                        # left[1] = z1 - 1
+                        # right[0] = z2 + 1
+                        # if debug: print(f'\OFF interval {z1}..{z2} overlapped with {left} and {right}. Intervals now: {intervals}')
                 else:
+                    if debug: import pdb; pdb.set_trace()
                     if is_on:
                         left[1] = z2
-                        if debug: print(f'\ON interval {z1}..{z2} overlapped with {left} but not {right}. Intervals now: {intervals}')
+                        if debug: print(f'\tON interval {z1}..{z2} overlapped with {left} (left) but not {right} (right). Intervals now: {intervals}')
                     else:
-                        left[1] = z1 - 1
-                        if debug: print(f'\OFF interval {z1}..{z2} overlapped with {left} but not {right}. Intervals now: {intervals}')
+                        raise Exception()
+                        # left[1] = z1 - 1
+                        # if debug: print(f'\OFF interval {z1}..{z2} overlapped with {left} but not {right}. Intervals now: {intervals}')
                 break
             else:
                 if _does_overlap((z1, z2), right):
                     if is_on:
-                        right[0] = z2
-                        if debug: print(f'\ON interval {z1}..{z2} overlapped with {right} but not {left}. Intervals now: {intervals}')
+                        intervals[i+1] = _turn_on(right, z1, z2)
+                        if debug: print(f'\tON interval {z1}..{z2} overlapped with {right} (right) but not {left} (left). Intervals now: {intervals}')
                     else:
-                        right[0] = z2 + 1
-                        if debug: print(f'\OFF interval {z1}..{z2} overlapped with {right} but not {left}. Intervals now: {intervals}')
+                        raise Exception()
+                        # right[0] = z2 + 1
+                        # if debug: print(f'\OFF interval {z1}..{z2} overlapped with {right} but not {left}. Intervals now: {intervals}')
                 break
         else:
             if is_on:
+                if debug: import pdb; pdb.set_trace()
                 intervals.append([z1,z2])
-                if debug: print(f'\ON interval {z1}..{z2} did not overlap any intervals, appending. Intervals now: {intervals}')
+                if debug: print(f'\tON interval {z1}..{z2} did not overlap any intervals, appending. Intervals now: {intervals}')
             else:
-                if debug: print(f'\OFF interval {z1}..{z2} did not overlap any intervals, skipping.')
+                raise Exception()
+                # if debug: print(f'\OFF interval {z1}..{z2} did not overlap any intervals, skipping.')
 
         intervals = sorted(intervals, key=lambda t: t[0])
         intervals = [i for i in intervals if i[0] <= i[1]]
@@ -178,6 +207,31 @@ def _get_cuboids_for_slice(slice_x1, slice_x2, slice_y1, slice_y2, commands):
     cuboids = [Cuboid(slice_x1, slice_x2, slice_y1, slice_y2, z1, z2) for z1, z2 in intervals]
 
     return cuboids
+
+
+def _is_valid_slice(slice_x1, slice_x2, slice_y1, slice_y2, commands):
+    # if (-36, -22) == (slice_y1, slice_y2):
+    #     import pdb; pdb.set_trace()
+    midpoint = _midpoint(slice_x1, slice_x2, slice_y1, slice_y2)
+    for _, x, y, _ in commands:
+        # if _does_overlap(x, (slice_x1, slice_x2)) and _does_overlap(y, (slice_y1, slice_y2)):
+        if _does_overlap(x, (midpoint[0],midpoint[0])) and _does_overlap(y, (midpoint[1],midpoint[1])):
+            return True
+    # import pdb; pdb.set_trace()
+    return False
+
+def _is_valid_slice_for_command(slice_x1, slice_x2, slice_y1, slice_y2, command):
+    midpoint = _midpoint(slice_x1, slice_x2, slice_y1, slice_y2)
+    _, x, y, _ = command
+        # if _does_overlap(x, (slice_x1, slice_x2)) and _does_overlap(y, (slice_y1, slice_y2)):
+    return _does_overlap(x, (midpoint[0],midpoint[0])) and _does_overlap(y, (midpoint[1],midpoint[1]))
+
+
+def _midpoint(slice_x1, slice_x2, slice_y1, slice_y2):
+    x = int((slice_x1 + slice_x2) / 2)
+    y = int((slice_y1 + slice_y2) / 2)
+    return [x,y]
+
 
 def _turn_off(left, z1, z2):
     assert left is not None
@@ -194,23 +248,12 @@ def _turn_off(left, z1, z2):
         return [[left[0], z1-1]]
 
 
-# def _get_total_intersecting_size(cuboid, other_cuboids):
-#     intersecting = []
-#     for other_cuboid in other_cuboids:
-#         intersecting_bounds = cuboid.get_bounds_of_intersection(other_cuboid)
-#         if not intersecting_bounds:
-#             continue
-#         (x0, x1),(y0, y1),(z0,z1) = intersecting_bounds
-#         intersecting.append(Cuboid(x0, x1, y0, y1, z0, z1))
-#     if not intersecting:
-#         return 0
-#     elif len(intersecting) == 1:
-#         return intersecting[0].size()
-#     else:
-#         return _get_total_intersecting_size(intersecting[0], intersecting[1:])
+def _turn_on(interval, z1, z2):
+    assert _does_overlap(interval, (z1, z2))
+    return [min(interval[0], z1), max(interval[1], z2)]
+
 
 def _does_overlap(first, second):
-    # import pdb; pdb.set_trace()
     return (first[1] >= second[0] and first[0] <= second[0]) or \
      (first[0] <= second[1] and first[1] >= second[1]) or \
       (first[0] <= second[0] and first[1] >= second[1]) or \
@@ -256,46 +299,8 @@ class Cuboid:
     def size(self):
         return (self.x2 - self.x1 + 1) * (self.y2 - self.y1 + 1) * (self.z2 - self.z1 + 1)
 
-    def get_bounds_of_intersection(self, other_cuboid):
-        x_overlap = self._overlap((self.x1, self.x2), (other_cuboid.x1, other_cuboid.x2))
-        y_overlap = self._overlap((self.y1, self.y2), (other_cuboid.y1, other_cuboid.y2))
-        z_overlap = self._overlap((self.z1, self.z2), (other_cuboid.z1, other_cuboid.z2))
-        if x_overlap and y_overlap and z_overlap:
-            return (x_overlap, y_overlap, z_overlap)
-        return None
-
-    def size_of_intersection(self, other_cuboids):
-        now = int(time())
-        all_intersecting_points = set()
-        for cuboid in other_cuboids:
-            intersecting = self.get_bounds_of_intersection(cuboid)
-            if not intersecting:
-                continue
-            all_intersecting_points = all_intersecting_points.union(self.generate_points_from_bounds(intersecting))
-        print(f'elapsed secs: {str(now - int(time()))}')
-        return len(all_intersecting_points)
-
-    def _overlap(self, first, second):
-        if first[1] < second[0] or second[1] < first[0]:
-            return None
-        return (max(first[0], second[0]), min(first[1], second[1]))
-
-    def generate_points(self):
-        return self.generate_points_from_bounds(((self.x1, self.x2), (self.y1, self.y2), (self.z1, self.z2)))
-
-    def generate_points_from_bounds(self, bounds):
-        (x1, x2),(y1, y2),(z1, z2) = bounds
-        result = set()
-        for x in range(x1, x2+1):
-            for y in range(y1, y2+1):
-                for z in range(z1, z2+1):
-                    result.add((x,y,z))
-        return result
-
     def __repr__(self):
         return f'({self.x1}..{self.x2}),({self.y1}..{self.y2}),({self.z1}..{self.z2})'
-
-
 
 
 def run_tests():
@@ -327,21 +332,67 @@ def run_tests():
     result_1 = run_1(test_inputs)
     if result_1 != 39:
         raise Exception(f"Test 1a did not pass, got {result_1}")
-    #
-    # cuboid = Cuboid(10,12,10,12,10,12)
-    # if (result := cuboid.size()) != 27:
-    #     raise Exception(result)
-    # if (result := cuboid.get_bounds_of_intersection(Cuboid(11,13,11,13,11,13))) != ((11, 12),(11, 12),(11, 12)):
-    #     raise Exception(result)
-    # if (result := cuboid.get_bounds_of_intersection(Cuboid(11,13,-4,5,11,13))) != None:
-    #     raise Exception(result)
-    #
-    # if (result := cuboid.get_bounds_of_intersection(Cuboid(0,20,-4,50,9,14))) != ((10, 12),(10, 12),(10, 12)):
-    #     raise Exception(result)
-    #
-    # if (result := Cuboid(-1,1,-8,-4,0,3).size()) != 60:
-    #     raise Exception(result)
-    #
+
+    test_inputs = """
+    on x=10..12,y=10..12,z=10..12
+    """.strip().split('\n')
+
+    result_1 = run_1(test_inputs)
+    if result_1 != 27:
+        raise Exception(f"Test did not pass, got {result_1}")
+
+    test_inputs = """
+    on x=10..12,y=10..12,z=10..12
+    off x=10..12,y=10..12,z=10..12
+    """.strip().split('\n')
+
+    result_1 = run_1(test_inputs)
+    if result_1 != 0:
+        raise Exception(f"Test did not pass, got {result_1}")
+
+    test_inputs = """
+    on x=10..12,y=10..12,z=10..12
+    on x=11..13,y=11..13,z=11..13
+    """.strip().split('\n')
+
+    result_1 = run_1(test_inputs)
+    if result_1 != 46:
+        raise Exception(f"Test did not pass, got {result_1}")
+
+    test_inputs = """
+    on x=10..12,y=10..12,z=10..12
+    off x=10..12,y=10..12,z=10..12
+    on x=10..12,y=10..12,z=50..50
+    """.strip().split('\n')
+
+    result_1 = run_1(test_inputs)
+    if result_1 != 9:
+        raise Exception(f"Test did not pass, got {result_1}")
+
+    test_inputs = """
+    on x=-20..26,y=-36..17,z=-47..7
+    """.strip().split('\n')
+
+    result_1 = run_1(test_inputs)
+    if result_1 != 139590:
+        raise Exception(f"Test did not pass, got {result_1}")
+
+    test_inputs = """
+    on x=-20..26,y=-36..17,z=-47..7
+    on x=-20..33,y=-21..23,z=-26..28
+    """.strip().split('\n')
+
+    result_1 = run_1(test_inputs)
+    if result_1 != 210918:
+        raise Exception(f"Test did not pass, got {result_1}")
+
+    cuboid = Cuboid(10,12,10,12,10,12)
+    if (result := cuboid.size()) != 27:
+        raise Exception(result)
+
+    if (result := Cuboid(-1,1,-8,-4,0,3).size()) != 60:
+        raise Exception(result)
+
     test_inputs = """
     on x=-20..26,y=-36..17,z=-47..7
     on x=-20..33,y=-21..23,z=-26..28
@@ -450,6 +501,8 @@ if __name__ == "__main__":
 
     result_1 = run_1(input)
     print(f"Finished 1 with result {result_1}")
+    if result_1 != 658691:
+        raise Exception(result_1)
 
     # result_2 = run_2(input)
     # print(f"Finished 2 with result {result_2}")
