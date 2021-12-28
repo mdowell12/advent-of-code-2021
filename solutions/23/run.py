@@ -25,31 +25,50 @@ def run_1(inputs):
     cave = Cave(_parse_inputs(inputs), None, None, None)
     # cave.print()
     caves = [cave]
-    finished = []
+    # finished = []
+    hash_to_score = {}
+    lowest_score = None
     i = 0
     while caves:
         i+=1
         cave = caves.pop(0)
         next_caves = cave.get_next_caves()
         for next_cave in next_caves:
+            hash = next_cave.hash()
             current_cost = next_cave.get_total_cost()
-            # print(current_cost)
-            if next_cave.is_organized():
-                import pdb; pdb.set_trace()
-                finished.append(next_cave)
-            elif current_cost > 1000000000:
+            if lowest_score is not None and current_cost >= lowest_score:
                 continue
+            if next_cave.is_organized():
+                # import pdb; pdb.set_trace()
+                print(f'cave finished with score {next_cave.get_total_cost()}')
+                lowest_score = current_cost
+                continue
+                # finished.append(next_cave)
+
+            if hashed_score := hash_to_score.get(hash):
+                if current_cost >= hashed_score:
+                    continue
             else:
-                caves.append(next_cave)
+                hash_to_score[hash] = current_cost
+            # print(current_cost)
+
+            caves.append(next_cave)
         # else:
         #     cave.print()
         # import pdb; pdb.set_trace()
-        if i % 1000 == 0:
+        if i % 100000 == 0:
+        # if i > 64000:
             cave.print_game()
+            print(i, len(caves), lowest_score)
+        # if i == 64314:
+        #     import pdb; pdb.set_trace()
             # import pdb; pdb.set_trace()
+        # if cave.grid[(5,2)] == 'B' and cave.grid[(5,3)] == 'B' and cave.grid[(7,2)] == 'C' and cave.grid[(7,3)] == 'C':
+        #     import pdb; pdb.set_trace()
 
-    costs = [c.get_total_cost() for c in finished]
-    return min(costs)
+    # costs = [c.get_total_cost() for c in finished]
+    # return min(costs)
+    return lowest_score
 
 
 def run_2(inputs):
@@ -151,8 +170,9 @@ class Cave:
         ]
 
         # Prefer going to the room
-        if to_room := [a for a in adjacents if a in self.AMPHIPOD_TO_ROOM_COORDS[amphipod_type]]:
-            adjacents = to_room
+        if not self._room_occupied_by_stranger(amphipod_type):
+            if to_room := [a for a in adjacents if a in self.AMPHIPOD_TO_ROOM_COORDS[amphipod_type]]:
+                adjacents = to_room
 
         for next_position in adjacents:
             # if self.last_move: import pdb; pdb.set_trace()
@@ -162,6 +182,9 @@ class Cave:
             if valid_next := self._get_valid_next_position(next_position, amphipod_type, position):
                 resulting_position, cost = valid_next
                 valid_nexts.append((resulting_position, amphipod_type, cost))
+        # if self.grid[(9,1)] == 'D' and self.grid[(1,1)] == 'D' and amphipod_type == 'D':
+        #     import pdb; pdb.set_trace()
+
         return valid_nexts
 
     def _get_valid_next_position(self, next_position, amphipod_type, current_position):
@@ -188,13 +211,19 @@ class Cave:
         elif next_position[1] == 1:
             # In hallway
             if self._amphipod_is_stopped(amphipod_type, current_position):
+                # # I just came out of another persons room so allow move
+                # if self.last_move[0][1] in {2,3}:
+                #     return (next_position, self.AMPHIPOD_TO_MOVE_COST[amphipod_type])
                 # I am stopped, I will only move if there is a clear path to my destination
                 if result := self._path_to_desination(next_position, amphipod_type):
                     return result
                 else:
                     return None
+            else:
+                return (next_position, self.AMPHIPOD_TO_MOVE_COST[amphipod_type])
 
-        return (next_position, self.AMPHIPOD_TO_MOVE_COST[amphipod_type])
+        raise Exception(next_position)
+        # return (next_position, self.AMPHIPOD_TO_MOVE_COST[amphipod_type])
 
     def _amphipod_is_stopped(self, amphipod_type, current_position):
         """
@@ -247,7 +276,9 @@ class Cave:
         caves.append(current)
         for i, cave in enumerate(reversed(caves)):
             _print_cave(cave.grid, i=i)
-            print(current.cost_last_move)
+
+    def hash(self):
+        return ''.join(str(k) + str(v) for k,v in self.grid.items())
 
 
 def _parse_inputs(inputs):
@@ -433,8 +464,9 @@ if __name__ == "__main__":
 
     input = read_inputs(23)
 
-    # result_1 = run_1(input)
-    # print(f"Finished 1 with result {result_1}")
+    # 16312 too high
+    result_1 = run_1(input)
+    print(f"Finished 1 with result {result_1}")
 
     # result_2 = run_2(input)
     # print(f"Finished 2 with result {result_2}")
