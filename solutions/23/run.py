@@ -22,52 +22,65 @@ when either the cave is organized or no possible moves can be made.
 """
 
 def run_1(inputs):
-    cave = Cave(_parse_inputs(inputs), None, None, None)
-    # cave.print()
+    cave = Cave(_parse_inputs(inputs), None, None, None, cost_so_far=0)
     caves = [cave]
-    # finished = []
+    lowest_cave = None
     hash_to_score = {}
     lowest_score = None
     i = 0
     while caves:
         i+=1
+
         cave = caves.pop(0)
+        # cave_cost = cave.get_total_cost()
+
+        # if lowest_score is not None and cave_cost >= lowest_score:
+        #     # print(f"Skipped cave because cave cost {cave_cost} is bigger than lowest score {lowest_score}")
+        #     continue
+
+        # hash = cave.hash()
+        # hashed_score = hash_to_score.get(hash)
+        # if hashed_score is None or cave_cost < hashed_score:
+        #     hash_to_score[hash] = cave_cost
+        # else:
+        #     continue
+
         next_caves = cave.get_next_caves()
         for next_cave in next_caves:
             hash = next_cave.hash()
             current_cost = next_cave.get_total_cost()
-            if lowest_score is not None and current_cost >= lowest_score:
-                continue
+            # if lowest_score is not None and current_cost >= lowest_score:
+            #     print(f"Skipped cave because current cost {current_cost} is bigger than lowest score {lowest_score}")
+            #     continue
             if next_cave.is_organized():
                 # import pdb; pdb.set_trace()
-                print(f'cave finished with score {next_cave.get_total_cost()}')
-                lowest_score = current_cost
+                # print(f'cave finished with score {next_cave.get_total_cost()}')
+                if lowest_score is None or current_cost < lowest_score:
+                    lowest_score = current_cost
+                    lowest_cave = next_cave
+                    # print(f'before {len(caves)}')
+                    # caves = [c for c in caves if c.get_total_cost() < lowest_score]
+                    # print(f'after {len(caves)}')
                 continue
                 # finished.append(next_cave)
-
             if hashed_score := hash_to_score.get(hash):
                 if current_cost >= hashed_score:
                     continue
+                else:
+                    hash_to_score[hash] = current_cost
             else:
                 hash_to_score[hash] = current_cost
             # print(current_cost)
 
             caves.append(next_cave)
-        # else:
-        #     cave.print()
-        # import pdb; pdb.set_trace()
-        if i % 100000 == 0:
-        # if i > 64000:
-            cave.print_game()
-            print(i, len(caves), lowest_score)
-        # if i == 64314:
-        #     import pdb; pdb.set_trace()
-            # import pdb; pdb.set_trace()
-        # if cave.grid[(5,2)] == 'B' and cave.grid[(5,3)] == 'B' and cave.grid[(7,2)] == 'C' and cave.grid[(7,3)] == 'C':
-        #     import pdb; pdb.set_trace()
 
-    # costs = [c.get_total_cost() for c in finished]
-    # return min(costs)
+        if i % 100000 == 0:
+            # cave.print_game()
+            # cave.print()
+            print(i, len(caves), lowest_score)
+    # import pdb; pdb.set_trace()
+    # lowest_cave.to_file()
+    print(f'final {lowest_score}')
     return lowest_score
 
 
@@ -91,6 +104,8 @@ class Cave:
         'D': {(9,2), (9,3)},
     }
 
+    AMPHIPODS = set(AMPHIPOD_TO_ROOM_COORDS.keys())
+
     ROOM_COORDS = set(c for i in AMPHIPOD_TO_ROOM_COORDS.values() for c in i)
 
     OUTSIDE_ROOM_TO_TYPE = {
@@ -100,11 +115,17 @@ class Cave:
         (9,1): 'D',
     }
 
-    def __init__(self, grid, previous_cave, last_move, cost_last_move):
+    def __init__(self,
+                 grid,
+                 previous_cave,
+                 last_move,
+                 cost_last_move,
+                 cost_so_far=0):
         self.grid = grid
         self.previous_cave = previous_cave
         self.last_move = last_move
         self.cost_last_move = cost_last_move
+        self.cost_so_far = cost_so_far
 
     def is_organized(self):
         return self.grid[(3, 3)] == self.grid[(3,2)] == 'A' \
@@ -121,7 +142,8 @@ class Cave:
                 new_grid[original_position] = '.'
                 new_grid[next_position] = amphipod_type
                 last_move = (original_position, next_position, amphipod_type)
-                result.append(Cave(new_grid, self, last_move, cost))
+                cost_so_far = self.cost_so_far + cost
+                result.append(Cave(new_grid, self, last_move, cost, cost_so_far=cost_so_far))
         return result
 
     def get_next_moves(self):
@@ -140,14 +162,15 @@ class Cave:
         return result
 
     def get_total_cost(self):
-        cost = 0
-        current = self
-        while current.cost_last_move is not None:
-            cost += current.cost_last_move
-            current = current.previous_cave
-        if current.cost_last_move:
-            cost += current.cost_last_move
-        return cost
+        # cost = 0
+        # current = self
+        # while current.cost_last_move is not None:
+        #     cost += current.cost_last_move
+        #     current = current.previous_cave
+        # if current.cost_last_move:
+        #     cost += current.cost_last_move
+        # assert self.cost_so_far == cost
+        return self.cost_so_far
 
     def _get_valid_nexts_for_amphipod(self, position, amphipod_type):
         # if amphipod_type == 'D': import pdb; pdb.set_trace()
@@ -264,8 +287,8 @@ class Cave:
         self.print()
         return ''
 
-    def print(self):
-        _print_cave(self.grid)
+    def print(self, file=None):
+        _print_cave(self.grid, file=file)
 
     def print_game(self):
         current = self
@@ -277,7 +300,22 @@ class Cave:
         for i, cave in enumerate(reversed(caves)):
             _print_cave(cave.grid, i=i)
 
+    def to_file(self):
+        current = self
+        caves = []
+        while current.previous_cave is not None:
+            caves.append(current)
+            current = current.previous_cave
+        caves.append(current)
+        with open('/tmp/aoc_24_debug.txt', 'w') as f:
+            f.write('last_move  last_score  current_score')
+            for i, cave in enumerate(reversed(caves)):
+                # cave.print(file=f)
+                f.write(f'{cave.last_move} {cave.cost_last_move} {cave.cost_so_far}')
+                f.write('\n')
+
     def hash(self):
+        # return ''.join(str(k) + str(v) for k,v in self.grid.items() if v in self.AMPHIPODS) + str(self.last_move)
         return ''.join(str(k) + str(v) for k,v in self.grid.items())
 
 
@@ -293,19 +331,22 @@ def _parse_inputs(inputs):
     return cave
 
 
-def _print_cave(grid, i=0):
+def _print_cave(grid, i=0, file=None):
+    if file is None:
+        import sys
+        file = sys.stdout
     max_x = max(i[0] for i in grid.keys())
     max_y = max(i[1] for i in grid.keys())
     buffer = '\t' * i
     for y in range(max_y + 1):
-        print(buffer, end='')
+        print(buffer, end='', file=file)
         for x in range(max_x + 1):
             val = grid.get((x,y), ' ')
             # if val == 0:
             #     print('\033[1;31m' + str(val), end=' ')
             # else:
             #     print("\033[0;0m" + str(val), end=' ')
-            print(str(val), end='')
+            print(str(val), end='', file=file)
         print()
 
 
