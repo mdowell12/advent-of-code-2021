@@ -4,15 +4,11 @@ from time import time
 from solutions.get_inputs import read_inputs
 
 
-debug = True
+debug = False
 
 
-def run_1b(inputs):
-    commands = [_parse_line(line) for line in inputs]
-    grid = {}
-    for command in commands:
-        grid = _do_command(command, grid)
-    return sum(int(i) for i in grid.values())
+CUBOIDS_FOR_SLICE_CACHE = {}
+
 
 def run_1(inputs):
     commands = [_parse_line(line) for line in inputs]
@@ -85,6 +81,7 @@ def _run(commands):
 
     return sum(c.size() for c in cuboids)
 
+
 """
 find and sort all x values regardless of position in interval
 find and sort all y values regardless of position in interval
@@ -102,7 +99,7 @@ def _get_cuboids_for_slice(slice_x1, slice_x2, slice_y1, slice_y2, commands):
 
     intervals = []
     if debug: print(f"cuboids for slice {slice_x1, slice_x2, slice_y1, slice_y2}")
-    # import pdb; pdb.set_trace()
+
     for is_on, (x1, x2), (y1, y2), (z1, z2) in commands:
         if debug: print(f'\tcommand: {is_on, (x1, x2), (y1, y2), (z1, z2)} and intervals: {intervals}')
 
@@ -121,117 +118,112 @@ def _get_cuboids_for_slice(slice_x1, slice_x2, slice_y1, slice_y2, commands):
                     new_intervals.append(interval)
             intervals = new_intervals
             if debug: print(f'\tOFF interval {z1}..{z2}. Intervals now: {intervals}')
-            continue
 
-
-        if len(intervals) == 0:
+        elif len(intervals) == 0:
             if is_on:
                 if debug: print(f'\tfirst ON interval {x1}..{x1} {y1}..{y2}. Added {z1}..{z2}.')
                 intervals.append([z1,z2])
             else:
                 if debug: print(f'\tfirst interval, but OFF {x1}..{x1} {y1}..{y2}. Skipped.')
-            # print(slice_x1, slice_x2, slice_y1, slice_y2, intervals)
-            continue
 
-        if len(intervals) == 1:
+        elif len(intervals) == 1:
             if _does_overlap(intervals[0], (z1, z2)):
                 if is_on:
                     intervals[0] = _turn_on(intervals[0], z1, z2)
                     if debug: print(f'\tON interval {z1}..{z2} overlapped. Intervals now: {intervals}')
                 else:
                     raise Exception()
-                    # intervals[0][1] = z1 - 1
-                    # new_intervals = _turn_off(intervals[0], None, z1, z2)
-                    # intervals[0] = new_intervals[0]
-                    # if len(new_intervals) > 1:
-                    #     intervals.append(new_intervals[1])
-                    # if debug: print(f'\tOFF interval {z1}..{z2} overlapped. Intervals now: {intervals}')
             else:
                 if is_on:
                     intervals.append([z1,z2])
                     if debug: print(f'\tON interval {z1}..{z2} did not overlap. Intervals now: {intervals}')
                 else:
                     raise Exception()
-                    # if debug: print(f'\tOFF interval {z1}..{z2} did not overlap. Skipped. Intervals now: {intervals}')
-            continue
 
-        for i in range(len(intervals) - 1):
-            left = intervals[i]
-            right = intervals[i+1]
-
-            if _does_overlap(left, (z1, z2)):
-                if _does_overlap((z1, z2), right):
-                    # import pdb; pdb.set_trace()
-                    if is_on:
-                        # stitch together
-                        new = _turn_on(left, z1, z2)
-                        new = _turn_on(right, new[0], new[1])
-                        intervals[i] = new
-                        del intervals[i+1]
-                        if debug: print(f'\tON interval {z1}..{z2} overlapped with {left} and {right}. Intervals now: {intervals}')
-                    else:
-                        raise Exception()
-                        # left[1] = z1 - 1
-                        # right[0] = z2 + 1
-                        # if debug: print(f'\OFF interval {z1}..{z2} overlapped with {left} and {right}. Intervals now: {intervals}')
-                else:
-                    if debug: import pdb; pdb.set_trace()
-                    if is_on:
-                        left[1] = z2
-                        if debug: print(f'\tON interval {z1}..{z2} overlapped with {left} (left) but not {right} (right). Intervals now: {intervals}')
-                    else:
-                        raise Exception()
-                        # left[1] = z1 - 1
-                        # if debug: print(f'\OFF interval {z1}..{z2} overlapped with {left} but not {right}. Intervals now: {intervals}')
-                break
-            else:
-                if _does_overlap((z1, z2), right):
-                    if is_on:
-                        intervals[i+1] = _turn_on(right, z1, z2)
-                        if debug: print(f'\tON interval {z1}..{z2} overlapped with {right} (right) but not {left} (left). Intervals now: {intervals}')
-                    else:
-                        raise Exception()
-                        # right[0] = z2 + 1
-                        # if debug: print(f'\OFF interval {z1}..{z2} overlapped with {right} but not {left}. Intervals now: {intervals}')
-                break
+        # if len(intervals) > 2:
+        #     import pdb; pdb.set_trace()
         else:
-            if is_on:
-                if debug: import pdb; pdb.set_trace()
-                intervals.append([z1,z2])
-                if debug: print(f'\tON interval {z1}..{z2} did not overlap any intervals, appending. Intervals now: {intervals}')
-            else:
-                raise Exception()
-                # if debug: print(f'\OFF interval {z1}..{z2} did not overlap any intervals, skipping.')
+            for i in range(len(intervals) - 1):
+                left = intervals[i]
+                right = intervals[i+1]
 
-        intervals = sorted(intervals, key=lambda t: t[0])
-        intervals = [i for i in intervals if i[0] <= i[1]]
-        # print(slice_x1, slice_x2, slice_y1, slice_y2, intervals)
-        # import pdb; pdb.set_trace()
-        if debug: print(f'\Finished with intervals {intervals}')
+                if _does_overlap(left, (z1, z2)):
+                    if _does_overlap((z1, z2), right):
+                        if is_on:
+                            # stitch together
+                            new = _turn_on(left, z1, z2)
+                            new = _turn_on(right, new[0], new[1])
+                            intervals[i] = new
+                            del intervals[i+1]
+                            if debug: print(f'\tON interval {z1}..{z2} overlapped with {left} and {right}. Intervals now: {intervals}')
+                        else:
+                            raise Exception()
+                    else:
+                        if is_on:
+                            intervals[i] = _turn_on(left, z1, z2)
+                            if debug: print(f'\tON interval {z1}..{z2} overlapped with {left} (left) but not {right} (right). Intervals now: {intervals}')
+                        else:
+                            raise Exception()
+                    break
+                else:
+                    if _does_overlap((z1, z2), right):
+                        if is_on:
+                            intervals[i+1] = _turn_on(right, z1, z2)
+                            if debug: print(f'\tON interval {z1}..{z2} overlapped with {right} (right) but not {left} (left). Intervals now: {intervals}')
+                        else:
+                            raise Exception()
+                    break
+            else:
+                if is_on:
+                    # if debug: import pdb; pdb.set_trace()
+                    import pdb; pdb.set_trace()
+                    intervals.append([z1,z2])
+                    if debug: print(f'\tON interval {z1}..{z2} did not overlap any intervals, appending. Intervals now: {intervals}')
+                else:
+                    raise Exception()
+
+        if intervals:
+            intervals = sorted(intervals, key=lambda t: t[0])
+            # intervals = [i for i in intervals if i[0] <= i[1]]
+            intervals = _stitch_intervals(intervals)
+
+        if debug: print(f'\tFinished with intervals {intervals}')
         if debug: print()
 
     if debug: print(f"final intervals {intervals}")
-    # if debug: print()
+
     cuboids = [Cuboid(slice_x1, slice_x2, slice_y1, slice_y2, z1, z2) for z1, z2 in intervals]
 
     return cuboids
 
 
+def _stitch_intervals(intervals):
+    """
+    e.g. [[-50, -48], [-36, 18], [4, 44]] -> [[-50, -48], [-36, 44]]
+    assumes intervals are sorted already
+    """
+    result = []
+    result = [intervals[0]]
+    for i in range(1, len(intervals)):
+        left = intervals[i-1]
+        right = intervals[i]
+        if left[1] < right[0]:
+            result.append(right)
+        else:
+            left[1] = max(right[1], left[1])
+    return result
+
+
 def _is_valid_slice(slice_x1, slice_x2, slice_y1, slice_y2, commands):
-    # if (-36, -22) == (slice_y1, slice_y2):
-    #     import pdb; pdb.set_trace()
     midpoint = _midpoint(slice_x1, slice_x2, slice_y1, slice_y2)
     for _, x, y, _ in commands:
-        # if _does_overlap(x, (slice_x1, slice_x2)) and _does_overlap(y, (slice_y1, slice_y2)):
         if _does_overlap(x, (midpoint[0],midpoint[0])) and _does_overlap(y, (midpoint[1],midpoint[1])):
             return True
-    # import pdb; pdb.set_trace()
     return False
 
 def _is_valid_slice_for_command(slice_x1, slice_x2, slice_y1, slice_y2, command):
     midpoint = _midpoint(slice_x1, slice_x2, slice_y1, slice_y2)
     _, x, y, _ = command
-        # if _does_overlap(x, (slice_x1, slice_x2)) and _does_overlap(y, (slice_y1, slice_y2)):
     return _does_overlap(x, (midpoint[0],midpoint[0])) and _does_overlap(y, (midpoint[1],midpoint[1]))
 
 
@@ -329,7 +321,19 @@ def run_tests():
     #
     # if (result := _does_overlap((9,11), (10, 10))) != True:
     #     raise Exception(result)
-    #
+
+    if (result := _stitch_intervals([[-50, -48], [-36, 18], [4, 44]])) != [[-50, -48], [-36, 44]]:
+        raise Exception(result)
+
+    if (result := _stitch_intervals([[-50, -48], [-36, 99], [4, 44]])) != [[-50, -48], [-36, 99]]:
+        raise Exception(result)
+
+    if (result := _stitch_intervals([[-50, -48], [4, 44]])) != [[-50, -48], [4, 44]]:
+        raise Exception(result)
+
+    if (result := _stitch_intervals([[-50, -48], [4, 44]])) != [[-50, -48], [4, 44]]:
+        raise Exception(result)
+
     # test_inputs = """
     # on x=10..12,y=10..12,z=10..12
     # on x=11..13,y=11..13,z=11..13
@@ -401,17 +405,39 @@ def run_tests():
     # if (result := Cuboid(-1,1,-8,-4,0,3).size()) != 60:
     #     raise Exception(result)
 
-    test_inputs = """
-    on x=-20..26,y=-36..17,z=-47..7
-    on x=-20..33,y=-21..23,z=-26..28
-    on x=-22..28,y=-29..23,z=-38..16
-    """.strip().split('\n')
-
-    result_1 = run_1(test_inputs)
-    if result_1 != 210918:
-        raise Exception(f"Test did not pass, got {result_1}")
-
-
+    # test_inputs = """
+    # on x=-20..26,y=-36..17,z=-47..7
+    # on x=-20..33,y=-21..23,z=-26..28
+    # on x=-22..28,y=-29..23,z=-38..16
+    # """.strip().split('\n')
+    #
+    # result_1 = run_1(test_inputs)
+    # if result_1 != 225476:
+    #     raise Exception(f"Test did not pass, got {result_1}")
+    #
+    # test_inputs = """
+    # on x=-20..26,y=-36..17,z=-47..7
+    # on x=-20..33,y=-21..23,z=-26..28
+    # on x=-22..28,y=-29..23,z=-38..16
+    # off x=-48..-20,y=23..25,z=-47..37
+    # """.strip().split('\n')
+    #
+    # result_1 = run_1(test_inputs)
+    # if result_1 != 225299:
+    #     raise Exception(f"Test did not pass, got {result_1}")
+    #
+    # test_inputs = """
+    # on x=-20..26,y=-36..17,z=-47..7
+    # on x=-20..33,y=-21..23,z=-26..28
+    # on x=-22..28,y=-29..23,z=-38..16
+    # off x=-48..-20,y=23..25,z=10..11
+    # """.strip().split('\n')
+    #
+    # result_1 = run_1(test_inputs)
+    # if result_1 != 225470:
+    #     raise Exception(f"Test did not pass, got {result_1}")
+    #
+    #
     test_inputs = """
     on x=-20..26,y=-36..17,z=-47..7
     on x=-20..33,y=-21..23,z=-26..28
@@ -510,6 +536,7 @@ def run_tests():
                  #   50044647512470
                  # 2331145530588708
                  # 2673593094113518
+                 # 2755019869817365
     if result_2 != 2758514936282235:
         raise Exception(f"Test 2 did not pass, got {result_2}")
 
