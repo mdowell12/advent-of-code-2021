@@ -54,14 +54,8 @@ def _run(commands):
 
     x_intervals = _get_intervals_from_values(x_values)
     y_intervals = _get_intervals_from_values(y_values)
-    # import pdb; pdb.set_trace()
 
     cuboids = []
-    # import pdb; pdb.set_trace()
-    # for i in range(len(x_values) - 1):
-    #     for j in range(len(y_values) - 1):
-    #         x1, x2 = x_values[i], x_values[i+1] - 1
-    #         y1, y2 = y_values[j], y_values[j+1] - 1
     for x1, x2 in x_intervals:
         for y1, y2 in y_intervals:
             if debug: print(f'{x1}..{x2} {y1}..{y2}')
@@ -72,12 +66,10 @@ def _run(commands):
                 cuboids_this_slice = _get_cuboids_for_slice(x1, x2, y1, y2, overlapping_commands)
                 if debug: print(f'adding size {sum(c.size() for c in cuboids_this_slice)}')
                 cuboids += cuboids_this_slice
-                # if debug: print(f'cuboids {cuboids}')
             else:
                 if debug: print(f'skipped slice {x1, x2, y1, y2}')
 
             if debug: print(f'total size {sum(c.size() for c in cuboids)}\n')
-            # import pdb; pdb.set_trace()
 
     return sum(c.size() for c in cuboids)
 
@@ -120,28 +112,20 @@ def _get_cuboids_for_slice(slice_x1, slice_x2, slice_y1, slice_y2, commands):
             if debug: print(f'\tOFF interval {z1}..{z2}. Intervals now: {intervals}')
 
         elif len(intervals) == 0:
-            if is_on:
-                if debug: print(f'\tfirst ON interval {x1}..{x1} {y1}..{y2}. Added {z1}..{z2}.')
-                intervals.append([z1,z2])
-            else:
-                if debug: print(f'\tfirst interval, but OFF {x1}..{x1} {y1}..{y2}. Skipped.')
+            assert is_on
+            if debug: print(f'\tfirst ON interval {x1}..{x1} {y1}..{y2}. Added {z1}..{z2}.')
+            intervals.append([z1,z2])
 
         elif len(intervals) == 1:
             if _does_overlap(intervals[0], (z1, z2)):
-                if is_on:
-                    intervals[0] = _turn_on(intervals[0], z1, z2)
-                    if debug: print(f'\tON interval {z1}..{z2} overlapped. Intervals now: {intervals}')
-                else:
-                    raise Exception()
+                assert is_on
+                intervals[0] = _turn_on(intervals[0], z1, z2)
+                if debug: print(f'\tON interval {z1}..{z2} overlapped. Intervals now: {intervals}')
             else:
-                if is_on:
-                    intervals.append([z1,z2])
-                    if debug: print(f'\tON interval {z1}..{z2} did not overlap. Intervals now: {intervals}')
-                else:
-                    raise Exception()
+                assert is_on
+                intervals.append([z1,z2])
+                if debug: print(f'\tON interval {z1}..{z2} did not overlap. Intervals now: {intervals}')
 
-        # if len(intervals) > 2:
-        #     import pdb; pdb.set_trace()
         else:
             for i in range(len(intervals) - 1):
                 left = intervals[i]
@@ -149,42 +133,32 @@ def _get_cuboids_for_slice(slice_x1, slice_x2, slice_y1, slice_y2, commands):
 
                 if _does_overlap(left, (z1, z2)):
                     if _does_overlap((z1, z2), right):
-                        if is_on:
-                            # stitch together
-                            new = _turn_on(left, z1, z2)
-                            new = _turn_on(right, new[0], new[1])
-                            intervals[i] = new
-                            del intervals[i+1]
-                            if debug: print(f'\tON interval {z1}..{z2} overlapped with {left} and {right}. Intervals now: {intervals}')
-                        else:
-                            raise Exception()
+                        assert is_on
+                        # stitch together
+                        new = _turn_on(left, z1, z2)
+                        new = _turn_on(right, new[0], new[1])
+                        intervals[i] = new
+                        del intervals[i+1]
+                        if debug: print(f'\tON interval {z1}..{z2} overlapped with {left} and {right}. Intervals now: {intervals}')
+                        break
                     else:
-                        if is_on:
-                            intervals[i] = _turn_on(left, z1, z2)
-                            if debug: print(f'\tON interval {z1}..{z2} overlapped with {left} (left) but not {right} (right). Intervals now: {intervals}')
-                        else:
-                            raise Exception()
-                    break
+                        assert is_on
+                        intervals[i] = _turn_on(left, z1, z2)
+                        if debug: print(f'\tON interval {z1}..{z2} overlapped with {left} (left) but not {right} (right). Intervals now: {intervals}')
+                        break
                 else:
                     if _does_overlap((z1, z2), right):
-                        if is_on:
-                            intervals[i+1] = _turn_on(right, z1, z2)
-                            if debug: print(f'\tON interval {z1}..{z2} overlapped with {right} (right) but not {left} (left). Intervals now: {intervals}')
-                        else:
-                            raise Exception()
-                    break
+                        assert is_on
+                        intervals[i+1] = _turn_on(right, z1, z2)
+                        if debug: print(f'\tON interval {z1}..{z2} overlapped with {right} (right) but not {left} (left). Intervals now: {intervals}')
+                        break
             else:
-                if is_on:
-                    # if debug: import pdb; pdb.set_trace()
-                    import pdb; pdb.set_trace()
-                    intervals.append([z1,z2])
-                    if debug: print(f'\tON interval {z1}..{z2} did not overlap any intervals, appending. Intervals now: {intervals}')
-                else:
-                    raise Exception()
+                assert is_on
+                intervals.append([z1,z2])
+                if debug: print(f'\tON interval {z1}..{z2} did not overlap any intervals, appending. Intervals now: {intervals}')
 
         if intervals:
             intervals = sorted(intervals, key=lambda t: t[0])
-            # intervals = [i for i in intervals if i[0] <= i[1]]
             intervals = _stitch_intervals(intervals)
 
         if debug: print(f'\tFinished with intervals {intervals}')
@@ -304,23 +278,23 @@ class Cuboid:
 
 
 def run_tests():
-    # if (result := _does_overlap((0,5), (3,6))) != True:
-    #     raise Exception(result)
-    #
-    # if (result := _does_overlap((6,10), (3,6))) != True:
-    #     raise Exception(result)
-    #
-    # if (result := _does_overlap((0,5), (100,105))) != False:
-    #     raise Exception(result)
-    #
-    # if (result := _does_overlap((-46, -41), (-4100, -4000))) != False:
-    #     raise Exception(result)
-    #
-    # if (result := _does_overlap((10, 10), (9,11))) != True:
-    #     raise Exception(result)
-    #
-    # if (result := _does_overlap((9,11), (10, 10))) != True:
-    #     raise Exception(result)
+    if (result := _does_overlap((0,5), (3,6))) != True:
+        raise Exception(result)
+
+    if (result := _does_overlap((6,10), (3,6))) != True:
+        raise Exception(result)
+
+    if (result := _does_overlap((0,5), (100,105))) != False:
+        raise Exception(result)
+
+    if (result := _does_overlap((-46, -41), (-4100, -4000))) != False:
+        raise Exception(result)
+
+    if (result := _does_overlap((10, 10), (9,11))) != True:
+        raise Exception(result)
+
+    if (result := _does_overlap((9,11), (10, 10))) != True:
+        raise Exception(result)
 
     if (result := _stitch_intervals([[-50, -48], [-36, 18], [4, 44]])) != [[-50, -48], [-36, 44]]:
         raise Exception(result)
@@ -334,110 +308,110 @@ def run_tests():
     if (result := _stitch_intervals([[-50, -48], [4, 44]])) != [[-50, -48], [4, 44]]:
         raise Exception(result)
 
-    # test_inputs = """
-    # on x=10..12,y=10..12,z=10..12
-    # on x=11..13,y=11..13,z=11..13
-    # off x=9..11,y=9..11,z=9..11
-    # on x=10..10,y=10..10,z=10..10
-    # """.strip().split('\n')
-    #
-    # result_1 = run_1(test_inputs)
-    # if result_1 != 39:
-    #     raise Exception(f"Test 1a did not pass, got {result_1}")
-    #
-    # test_inputs = """
-    # on x=10..12,y=10..12,z=10..12
-    # """.strip().split('\n')
-    #
-    # result_1 = run_1(test_inputs)
-    # if result_1 != 27:
-    #     raise Exception(f"Test did not pass, got {result_1}")
-    #
-    # test_inputs = """
-    # on x=10..12,y=10..12,z=10..12
-    # off x=10..12,y=10..12,z=10..12
-    # """.strip().split('\n')
-    #
-    # result_1 = run_1(test_inputs)
-    # if result_1 != 0:
-    #     raise Exception(f"Test did not pass, got {result_1}")
-    #
-    # test_inputs = """
-    # on x=10..12,y=10..12,z=10..12
-    # on x=11..13,y=11..13,z=11..13
-    # """.strip().split('\n')
-    #
-    # result_1 = run_1(test_inputs)
-    # if result_1 != 46:
-    #     raise Exception(f"Test did not pass, got {result_1}")
-    #
-    # test_inputs = """
-    # on x=10..12,y=10..12,z=10..12
-    # off x=10..12,y=10..12,z=10..12
-    # on x=10..12,y=10..12,z=50..50
-    # """.strip().split('\n')
-    #
-    # result_1 = run_1(test_inputs)
-    # if result_1 != 9:
-    #     raise Exception(f"Test did not pass, got {result_1}")
-    #
-    # test_inputs = """
-    # on x=-20..26,y=-36..17,z=-47..7
-    # """.strip().split('\n')
-    #
-    # result_1 = run_1(test_inputs)
-    # if result_1 != 139590:
-    #     raise Exception(f"Test did not pass, got {result_1}")
-    #
-    # test_inputs = """
-    # on x=-20..26,y=-36..17,z=-47..7
-    # on x=-20..33,y=-21..23,z=-26..28
-    # """.strip().split('\n')
-    #
-    # result_1 = run_1(test_inputs)
-    # if result_1 != 210918:
-    #     raise Exception(f"Test did not pass, got {result_1}")
-    #
-    # cuboid = Cuboid(10,12,10,12,10,12)
-    # if (result := cuboid.size()) != 27:
-    #     raise Exception(result)
-    #
-    # if (result := Cuboid(-1,1,-8,-4,0,3).size()) != 60:
-    #     raise Exception(result)
+    test_inputs = """
+    on x=10..12,y=10..12,z=10..12
+    on x=11..13,y=11..13,z=11..13
+    off x=9..11,y=9..11,z=9..11
+    on x=10..10,y=10..10,z=10..10
+    """.strip().split('\n')
 
-    # test_inputs = """
-    # on x=-20..26,y=-36..17,z=-47..7
-    # on x=-20..33,y=-21..23,z=-26..28
-    # on x=-22..28,y=-29..23,z=-38..16
-    # """.strip().split('\n')
-    #
-    # result_1 = run_1(test_inputs)
-    # if result_1 != 225476:
-    #     raise Exception(f"Test did not pass, got {result_1}")
-    #
-    # test_inputs = """
-    # on x=-20..26,y=-36..17,z=-47..7
-    # on x=-20..33,y=-21..23,z=-26..28
-    # on x=-22..28,y=-29..23,z=-38..16
-    # off x=-48..-20,y=23..25,z=-47..37
-    # """.strip().split('\n')
-    #
-    # result_1 = run_1(test_inputs)
-    # if result_1 != 225299:
-    #     raise Exception(f"Test did not pass, got {result_1}")
-    #
-    # test_inputs = """
-    # on x=-20..26,y=-36..17,z=-47..7
-    # on x=-20..33,y=-21..23,z=-26..28
-    # on x=-22..28,y=-29..23,z=-38..16
-    # off x=-48..-20,y=23..25,z=10..11
-    # """.strip().split('\n')
-    #
-    # result_1 = run_1(test_inputs)
-    # if result_1 != 225470:
-    #     raise Exception(f"Test did not pass, got {result_1}")
-    #
-    #
+    result_1 = run_1(test_inputs)
+    if result_1 != 39:
+        raise Exception(f"Test 1a did not pass, got {result_1}")
+
+    test_inputs = """
+    on x=10..12,y=10..12,z=10..12
+    """.strip().split('\n')
+
+    result_1 = run_1(test_inputs)
+    if result_1 != 27:
+        raise Exception(f"Test did not pass, got {result_1}")
+
+    test_inputs = """
+    on x=10..12,y=10..12,z=10..12
+    off x=10..12,y=10..12,z=10..12
+    """.strip().split('\n')
+
+    result_1 = run_1(test_inputs)
+    if result_1 != 0:
+        raise Exception(f"Test did not pass, got {result_1}")
+
+    test_inputs = """
+    on x=10..12,y=10..12,z=10..12
+    on x=11..13,y=11..13,z=11..13
+    """.strip().split('\n')
+
+    result_1 = run_1(test_inputs)
+    if result_1 != 46:
+        raise Exception(f"Test did not pass, got {result_1}")
+
+    test_inputs = """
+    on x=10..12,y=10..12,z=10..12
+    off x=10..12,y=10..12,z=10..12
+    on x=10..12,y=10..12,z=50..50
+    """.strip().split('\n')
+
+    result_1 = run_1(test_inputs)
+    if result_1 != 9:
+        raise Exception(f"Test did not pass, got {result_1}")
+
+    test_inputs = """
+    on x=-20..26,y=-36..17,z=-47..7
+    """.strip().split('\n')
+
+    result_1 = run_1(test_inputs)
+    if result_1 != 139590:
+        raise Exception(f"Test did not pass, got {result_1}")
+
+    test_inputs = """
+    on x=-20..26,y=-36..17,z=-47..7
+    on x=-20..33,y=-21..23,z=-26..28
+    """.strip().split('\n')
+
+    result_1 = run_1(test_inputs)
+    if result_1 != 210918:
+        raise Exception(f"Test did not pass, got {result_1}")
+
+    cuboid = Cuboid(10,12,10,12,10,12)
+    if (result := cuboid.size()) != 27:
+        raise Exception(result)
+
+    if (result := Cuboid(-1,1,-8,-4,0,3).size()) != 60:
+        raise Exception(result)
+
+    test_inputs = """
+    on x=-20..26,y=-36..17,z=-47..7
+    on x=-20..33,y=-21..23,z=-26..28
+    on x=-22..28,y=-29..23,z=-38..16
+    """.strip().split('\n')
+
+    result_1 = run_1(test_inputs)
+    if result_1 != 225476:
+        raise Exception(f"Test did not pass, got {result_1}")
+
+    test_inputs = """
+    on x=-20..26,y=-36..17,z=-47..7
+    on x=-20..33,y=-21..23,z=-26..28
+    on x=-22..28,y=-29..23,z=-38..16
+    off x=-48..-20,y=23..25,z=-47..37
+    """.strip().split('\n')
+
+    result_1 = run_1(test_inputs)
+    if result_1 != 225299:
+        raise Exception(f"Test did not pass, got {result_1}")
+
+    test_inputs = """
+    on x=-20..26,y=-36..17,z=-47..7
+    on x=-20..33,y=-21..23,z=-26..28
+    on x=-22..28,y=-29..23,z=-38..16
+    off x=-48..-20,y=23..25,z=10..11
+    """.strip().split('\n')
+
+    result_1 = run_1(test_inputs)
+    if result_1 != 225470:
+        raise Exception(f"Test did not pass, got {result_1}")
+
+
     test_inputs = """
     on x=-20..26,y=-36..17,z=-47..7
     on x=-20..33,y=-21..23,z=-26..28
@@ -551,5 +525,6 @@ if __name__ == "__main__":
     if result_1 != 658691:
         raise Exception(result_1)
 
-    # result_2 = run_2(input)
-    # print(f"Finished 2 with result {result_2}")
+    # This is very slow, like 30 mins
+    result_2 = run_2(input)
+    print(f"Finished 2 with result {result_2}")
