@@ -1,3 +1,5 @@
+from abc import ABC, abstractmethod
+
 from solutions.get_inputs import read_inputs
 
 """
@@ -22,7 +24,16 @@ when either the cave is organized or no possible moves can be made.
 """
 
 def run_1(inputs):
-    cave = Cave(_parse_inputs(inputs), None, None, None, cost_so_far=0)
+    cave = Cave1(_parse_inputs(inputs), None, None, None, cost_so_far=0)
+    return _run(cave)
+
+
+def run_2(inputs):
+    cave = Cave2(_parse_inputs(inputs), None, None, None, cost_so_far=0)
+    return _run(cave)
+
+
+def _run(cave):
     caves = [cave]
     hash_to_score = {}
     lowest_cave = None
@@ -61,11 +72,7 @@ def run_1(inputs):
     return lowest_score
 
 
-def run_2(inputs):
-    pass
-
-
-class Cave:
+class Cave(ABC):
 
     AMPHIPOD_TO_MOVE_COST = {
         'A': 1,
@@ -74,23 +81,7 @@ class Cave:
         'D': 1000,
     }
 
-    AMPHIPOD_TO_ROOM_COORDS = {
-        'A': {(3,2), (3,3)},
-        'B': {(5,2), (5,3)},
-        'C': {(7,2), (7,3)},
-        'D': {(9,2), (9,3)},
-    }
-
-    AMPHIPODS = set(AMPHIPOD_TO_ROOM_COORDS.keys())
-
-    ROOM_COORDS = set(c for i in AMPHIPOD_TO_ROOM_COORDS.values() for c in i)
-
-    OUTSIDE_ROOM_TO_TYPE = {
-        (3,1): 'A',
-        (5,1): 'B',
-        (7,1): 'C',
-        (9,1): 'D',
-    }
+    AMPHIPODS = set(AMPHIPOD_TO_MOVE_COST.keys())
 
     def __init__(self,
                  grid,
@@ -104,11 +95,29 @@ class Cave:
         self.cost_last_move = cost_last_move
         self.cost_so_far = cost_so_far
 
+    @abstractmethod
     def is_organized(self):
-        return self.grid[(3, 3)] == self.grid[(3,2)] == 'A' \
-            and self.grid[(5, 3)] == self.grid[(5,2)] == 'B' \
-            and self.grid[(7, 3)] == self.grid[(7,2)] == 'C' \
-            and self.grid[(9, 3)] == self.grid[(9,2)] == 'D'
+        pass
+
+    @abstractmethod
+    def create_new_cave(self, new_grid, last_move, cost, cost_so_far):
+        pass
+
+    @abstractmethod
+    def get_amphipod_to_room_coords(self):
+        pass
+
+    @abstractmethod
+    def get_room_coords(self):
+        return
+
+    @abstractmethod
+    def path_out_of_room_is_clear(self, position):
+        """
+        I am in another's room and want to get out. Return True if I am at the
+        edge of the room or if I am deeper in the room but the path out is clear.
+        """
+        pass
 
     def get_next_caves(self):
         next_moves = self.get_next_moves()
@@ -120,7 +129,8 @@ class Cave:
                 new_grid[next_position] = amphipod_type
                 last_move = (original_position, next_position, amphipod_type)
                 cost_so_far = self.cost_so_far + cost
-                result.append(Cave(new_grid, self, last_move, cost, cost_so_far=cost_so_far))
+                new_cave = self.create_new_cave(new_grid, last_move, cost, cost_so_far)
+                result.append(new_cave)
         return result
 
     def get_next_moves(self):
@@ -141,58 +151,71 @@ class Cave:
     def get_total_cost(self):
         return self.cost_so_far
 
+    def _room_occupied_by_stranger(self, amphipod_type):
+        my_room_coords = self.get_amphipod_to_room_coords()[amphipod_type]
+        return not all(self.grid[c] in {amphipod_type, '.'} for c in my_room_coords)
+
+    def _amphipod_is_stopped(self, amphipod_type, current_position):
+        """
+        amphipod is stopped if the last move was made by another amphipod
+        """
+        return self.last_move[2] != amphipod_type or self.last_move[1] != current_position
+
+    def _hallway_above_me_is_not_occupied(self, my_x):
+        return self.grid[(my_x, 1)] == '.'
+
+    def _is_backwards_move(self, amphipod_type, next_position):
+        return self.last_move and self.last_move[2] == amphipod_type and self.last_move[0] == next_position
+
     def _get_valid_nexts_for_amphipod(self, position, amphipod_type):
-        if position in self.ROOM_COORDS:
-            if position in self.AMPHIPOD_TO_ROOM_COORDS[amphipod_type] and not self._room_occupied_by_stranger(amphipod_type):
+        if position in self.get_room_coords():
+            # I am in my room and there are no strangers here, so stay here
+            if position in self.get_amphipod_to_room_coords()[amphipod_type] and not self._room_occupied_by_stranger(amphipod_type):
                 return []
-            # Move out of other home
-            elif (position[1] == 2 or self.grid[(position[0], position[1] - 1)] == '.')  and self.grid[(position[0], 1)] == '.':
+            # In another's room, try and move out of other home
+            elif self.path_out_of_room_is_clear(position) and self._hallway_above_me_is_not_occupied(position[0]):
                 return [((position[0], 1), amphipod_type, self.AMPHIPOD_TO_MOVE_COST[amphipod_type] * (position[1]-1))]
             # No moves
             else:
                 return []
 
-        valid_nexts = []
-        adjacents = [
-            (position[0]-1, position[1]),
-            (position[0]+1, position[1]),
-            (position[0], position[1]-1),
-            (position[0], position[1]+1),
-        ]
+        else:
+            valid_nexts = []
+            adjacents = [
+                (position[0]-1, position[1]),
+                (position[0]+1, position[1]),
+                (position[0], position[1]-1),
+                (position[0], position[1]+1),
+            ]
 
-        # Prefer going to the room
-        if not self._room_occupied_by_stranger(amphipod_type):
-            if to_room := [a for a in adjacents if a in self.AMPHIPOD_TO_ROOM_COORDS[amphipod_type]]:
-                adjacents = to_room
+            # Prefer going to the room by filtering candidate next positions
+            if not self._room_occupied_by_stranger(amphipod_type):
+                if to_room := [a for a in adjacents if a in self.get_amphipod_to_room_coords()[amphipod_type]]:
+                    adjacents = to_room
 
-        for next_position in adjacents:
-            if self.last_move and self.last_move[2] == amphipod_type and self.last_move[0] == next_position:
-                # Never go backwards
-                continue
-            if valid_next := self._get_valid_next_position(next_position, amphipod_type, position):
-                resulting_position, cost = valid_next
-                valid_nexts.append((resulting_position, amphipod_type, cost))
+            for next_position in adjacents:
+                if self._is_backwards_move(amphipod_type, next_position):
+                    # Never go backwards
+                    continue
+                if valid_next := self._get_valid_next_position(next_position, amphipod_type, position):
+                    resulting_position, cost = valid_next
+                    valid_nexts.append((resulting_position, amphipod_type, cost))
 
-        return valid_nexts
+            return valid_nexts
 
     def _get_valid_next_position(self, next_position, amphipod_type, current_position):
         char_at_next = self.grid.get(next_position, '-1')
         if char_at_next != '.':
             return None
-        if next_position in self.ROOM_COORDS:
-            my_room_coords = self.AMPHIPOD_TO_ROOM_COORDS[amphipod_type]
+        if next_position in self.get_room_coords():
+            my_room_coords = self.get_amphipod_to_room_coords()[amphipod_type]
             if next_position not in my_room_coords:
-                # Never go in someone elses room
+                # Never go in someone else's room
                 return None
             else:
                 # This is my room and next position is unoccupied. Make sure room is empty or has my type.
                 if not self._room_occupied_by_stranger(amphipod_type):
-                    if all(self.grid[c] == '.' for c in my_room_coords):
-                        # Move to bottom
-                        x,y = next_position
-                        return ((x, y+1), 2*self.AMPHIPOD_TO_MOVE_COST[amphipod_type])
-                    else:
-                        return (next_position, self.AMPHIPOD_TO_MOVE_COST[amphipod_type])
+                    return self._move_into_room(amphipod_type)
                 else:
                     return None
         elif next_position[1] == 1:
@@ -204,33 +227,52 @@ class Cave:
                 else:
                     return None
             else:
+                # Otherwise we just have a regular forward move
                 return (next_position, self.AMPHIPOD_TO_MOVE_COST[amphipod_type])
 
         raise Exception(next_position)
 
-    def _amphipod_is_stopped(self, amphipod_type, current_position):
-        """
-        amphipod is stopped if the last move was made by another amphipod
-        """
-        return self.last_move[2] != amphipod_type or self.last_move[1] != current_position
-
     def _path_to_desination(self, next_position, amphipod_type):
-        my_room_x = list(self.AMPHIPOD_TO_ROOM_COORDS[amphipod_type])[0][0]
+        my_room_x = list(self.get_amphipod_to_room_coords()[amphipod_type])[0][0]
         all_x_between = list(range(next_position[0], my_room_x + 1)) if my_room_x >= next_position[0] else list(range(my_room_x, next_position[0] + 1))
         if not all(self.grid[(x, 1)] == '.' for x in all_x_between):
+            # Someone is blocking the hallway
             return None
         elif self._room_occupied_by_stranger(amphipod_type):
             return None
         else:
-            bottom_occupied = self.grid[(my_room_x, 3)] != '.'
-            final_position = (my_room_x, 2) if bottom_occupied else (my_room_x, 3)
-            to_room_multiplier = 1 if bottom_occupied else 2
-            total_cost = self.AMPHIPOD_TO_MOVE_COST[amphipod_type]*len(all_x_between) + self.AMPHIPOD_TO_MOVE_COST[amphipod_type]*to_room_multiplier
+            # Give path from here to the lowest point in our room
+            top_of_my_room = (my_room_x, 2)
+            my_room_coords = self.get_amphipod_to_room_coords()[amphipod_type]
+            final_position, cost_from_room_boundary_to_final_position = self._move_into_room(amphipod_type)
+
+            cost_to_room_boundary = self.AMPHIPOD_TO_MOVE_COST[amphipod_type]*len(all_x_between)
+
+            total_cost = cost_to_room_boundary + cost_from_room_boundary_to_final_position
+
             return (final_position, total_cost)
 
-    def _room_occupied_by_stranger(self, amphipod_type):
-        my_room_coords = self.AMPHIPOD_TO_ROOM_COORDS[amphipod_type]
-        return not all(self.grid[c] in {amphipod_type, '.'} for c in my_room_coords)
+    def _move_into_room(self, amphipod_type):
+        """
+        We are at the edge of our own room and it is not occupied by strangers,
+        so let's move into the lowest unoccupied position of our room.
+        """
+        my_room_coords = self.get_amphipod_to_room_coords()[amphipod_type]
+        my_room_coords_sorted_by_y_ascending = sorted(list(my_room_coords), key=lambda x: x[1], reverse=True)
+
+        for coord in my_room_coords_sorted_by_y_ascending:
+            if self.grid[coord] == '.':
+                cost = (coord[1] - 1) * self.AMPHIPOD_TO_MOVE_COST[amphipod_type]
+                return (coord, cost)
+        raise Exception("Could not find coord in room to move to")
+
+    def path_out_of_room_is_clear(self, position):
+        """
+        I am in another's room and want to get out. Return True if I am at the
+        edge of the room or if I am deeper in the room but the path out is clear.
+        """
+        my_x, my_y = position
+        return my_y == 2 or all(self.grid[(my_x, y)] == '.' for y in range(my_y-1, 1, -1))
 
     def __repr__(self):
         self.print()
@@ -255,6 +297,96 @@ class Cave:
 
     def hash(self):
         return ''.join(str(k) + str(v) for k,v in self.grid.items())
+
+
+class Cave1(Cave):
+
+    AMPHIPOD_TO_ROOM_COORDS = {
+        'A': {(3,2), (3,3)},
+        'B': {(5,2), (5,3)},
+        'C': {(7,2), (7,3)},
+        'D': {(9,2), (9,3)},
+    }
+
+    ROOM_COORDS = set(c for i in AMPHIPOD_TO_ROOM_COORDS.values() for c in i)
+
+    def __init__(self,
+                 grid,
+                 previous_cave,
+                 last_move,
+                 cost_last_move,
+                 cost_so_far=0):
+        Cave.__init__(self, grid, previous_cave, last_move, cost_last_move, cost_so_far=cost_so_far)
+
+    def is_organized(self):
+        return self.grid[(3, 3)] == self.grid[(3,2)] == 'A' \
+            and self.grid[(5, 3)] == self.grid[(5,2)] == 'B' \
+            and self.grid[(7, 3)] == self.grid[(7,2)] == 'C' \
+            and self.grid[(9, 3)] == self.grid[(9,2)] == 'D'
+
+    def create_new_cave(self, new_grid, last_move, cost, cost_so_far):
+        return Cave1(new_grid, self, last_move, cost, cost_so_far=cost_so_far)
+
+    def get_amphipod_to_room_coords(self):
+        return self.AMPHIPOD_TO_ROOM_COORDS
+
+    def get_room_coords(self):
+        return self.ROOM_COORDS
+
+
+class Cave2(Cave):
+
+    AMPHIPOD_TO_ROOM_COORDS = {
+        'A': {(3,2), (3,3), (3,4), (3,5)},
+        'B': {(5,2), (5,3), (5,4), (5,5)},
+        'C': {(7,2), (7,3), (7,4), (7,5)},
+        'D': {(9,2), (9,3), (9,4), (9,5)},
+    }
+
+    ROOM_COORDS = set(c for i in AMPHIPOD_TO_ROOM_COORDS.values() for c in i)
+
+    def __init__(self,
+                 grid,
+                 previous_cave,
+                 last_move,
+                 cost_last_move,
+                 cost_so_far=0):
+        Cave.__init__(self, grid, previous_cave, last_move, cost_last_move, cost_so_far=cost_so_far)
+        self._insert_lines_to_grid()
+
+    def _insert_lines_to_grid(self):
+        """
+        Adding these lines to the grid per the instructions:
+
+        #D#C#B#A#
+        #D#B#A#C#
+        """
+        # Copy rows 3 and 4 to their new homes, 5 and 6
+        for x, y in [c for c in self.grid]:
+            if y == 3:
+                self.grid[(x, 5)] = self.grid[(x, y)]
+            if y == 4:
+                self.grid[(x, 6)] = self.grid[(x, y)]
+        # Add new row 3 and new row 4
+        for x, char in enumerate(list('  #D#C#B#A#')):
+            self.grid[(x, 3)] = char
+        for x, char in enumerate(list('  #D#B#A#C#')):
+            self.grid[(x, 4)] = char
+
+    def is_organized(self):
+        return all(self.grid[(3, y)] == 'A' for y in range(2, 6)) \
+            and all(self.grid[(5, y)] == 'B' for y in range(2, 6)) \
+            and all(self.grid[(7, y)] == 'C' for y in range(2, 6)) \
+            and all(self.grid[(9, y)] == 'D' for y in range(2, 6))
+
+    def create_new_cave(self, new_grid, last_move, cost, cost_so_far):
+        return Cave2(new_grid, self, last_move, cost, cost_so_far=cost_so_far)
+
+    def get_amphipod_to_room_coords(self):
+        return self.AMPHIPOD_TO_ROOM_COORDS
+
+    def get_room_coords(self):
+        return self.ROOM_COORDS
 
 
 def _parse_inputs(inputs):
@@ -293,7 +425,7 @@ def run_tests():
   #########
     """.strip().split('\n')
 
-    cave = Cave(_parse_inputs(test_inputs), None, None, None)
+    cave = Cave1(_parse_inputs(test_inputs), None, None, None)
     if (result := cave.is_organized()) != False:
         raise Exception(result)
 
@@ -305,7 +437,7 @@ def run_tests():
   #########
     """.strip().split('\n')
 
-    cave = Cave(_parse_inputs(test_inputs), None, None, None)
+    cave = Cave1(_parse_inputs(test_inputs), None, None, None)
     if (result := cave.is_organized()) != True:
         raise Exception(result)
 
@@ -317,7 +449,7 @@ def run_tests():
   #########
     """.strip().split('\n')
 
-    cave = Cave(_parse_inputs(test_inputs), None, None, None)
+    cave = Cave1(_parse_inputs(test_inputs), None, None, None)
     if (result := cave.is_organized()) != False:
         raise Exception(result)
 
@@ -331,7 +463,7 @@ def run_tests():
   #A#C#.#D#
   #########
     """.strip().split('\n')
-    cave = Cave(_parse_inputs(test_inputs), None, None, None)
+    cave = Cave1(_parse_inputs(test_inputs), None, None, None)
     if (result := cave._get_valid_nexts_for_amphipod((5,3), 'C')) != [((5,1), 'C', 200)]:
         raise Exception(result)
 
@@ -347,7 +479,7 @@ def run_tests():
   #########
     """.strip().split('\n')
     # Cannot move into non-destination room
-    cave = Cave(_parse_inputs(test_inputs), None, None, None)
+    cave = Cave1(_parse_inputs(test_inputs), None, None, None)
     if (result := cave._get_valid_nexts_for_amphipod((7,1), 'B')) != []:
         raise Exception(result)
 
@@ -362,7 +494,7 @@ def run_tests():
   #########
     """.strip().split('\n')
     # Can move into room
-    cave = Cave(_parse_inputs(test_inputs), None, None, None)
+    cave = Cave1(_parse_inputs(test_inputs), None, None, None)
     if (result := cave._get_valid_nexts_for_amphipod((7,1), 'C')) != [((7,3), 'C', 200)]:
         raise Exception(result)
 
@@ -374,7 +506,7 @@ def run_tests():
   #########
     """.strip().split('\n')
     # Can move into room
-    cave = Cave(_parse_inputs(test_inputs), None, None, None)
+    cave = Cave1(_parse_inputs(test_inputs), None, None, None)
     if (result := cave._get_valid_nexts_for_amphipod((7,1), 'C')) != [((7,2), 'C', 100)]:
         raise Exception(result)
 
@@ -386,7 +518,7 @@ def run_tests():
   #########
     """.strip().split('\n')
     # Cannot move into room with wrong type in it
-    cave = Cave(_parse_inputs(test_inputs), None, None, None)
+    cave = Cave1(_parse_inputs(test_inputs), None, None, None)
     if (result := cave._get_valid_nexts_for_amphipod((7,1), 'B')) != []:
         raise Exception(result)
 
@@ -397,7 +529,7 @@ def run_tests():
       #A#B#C#A#
       #########
     """.strip().split('\n')
-    cave = Cave(_parse_inputs(test_inputs), None, ((7,2), (7,1), 'D'), None)
+    cave = Cave1(_parse_inputs(test_inputs), None, ((7,2), (7,1), 'D'), None)
     if (result := cave._get_valid_nexts_for_amphipod((7,1), 'D')) != [((6, 1), 'D', 1000), ((8, 1), 'D', 1000)]:
         raise Exception(result)
 
@@ -409,13 +541,13 @@ def run_tests():
   #########
     """.strip().split('\n')
 
-    result_1 = run_1(test_inputs)
-    if result_1 != 12521:
-        raise Exception(f"Test 1 did not pass, got {result_1}")
+    # result_1 = run_1(test_inputs)
+    # if result_1 != 12521:
+    #     raise Exception(f"Test 1 did not pass, got {result_1}")
 
-    # result_2 = run_2(test_inputs)
-    # if result_2 != 0:
-    #     raise Exception(f"Test 2 did not pass, got {result_2}")
+    result_2 = run_2(test_inputs)
+    if result_2 != 44169:
+        raise Exception(f"Test 2 did not pass, got {result_2}")
 
 
 if __name__ == "__main__":
@@ -426,5 +558,5 @@ if __name__ == "__main__":
     result_1 = run_1(input)
     print(f"Finished 1 with result {result_1}")
 
-    # result_2 = run_2(input)
-    # print(f"Finished 2 with result {result_2}")
+    result_2 = run_2(input)
+    print(f"Finished 2 with result {result_2}")
