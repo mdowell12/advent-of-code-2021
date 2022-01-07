@@ -9,7 +9,7 @@ when either the cave is organized or no possible moves can be made.
 # DONE model the cave - (x,y) coordinate system with bounds, or dict that maps coordinate to X, . or amphipod?
 # DONE parse input
 # DONE create the tree data structure. BFS with queue of still processing caves and add to "finished" list of organized caves that can each reference previous and calc total cost.
-# WIP Function to determine all possible moves each amphipod can make with a given configuration
+# DONE Function to determine all possible moves each amphipod can make with a given configuration
     - needs to take into account not stopping in front of room
     - needs to take into account that if in hallway and stops, is locked until it can move fully into its room
     - needs to filter valid moves when one results in amphipod in its destination room
@@ -18,51 +18,31 @@ when either the cave is organized or no possible moves can be made.
 # DONE Function to determine if cave is organized
 
 # OPTIMIZE:
-  - TODO If game has finished, begin cutting off any other games that have higher score
+  - DONE If game has finished, begin cutting off any other games that have higher score
 """
 
 def run_1(inputs):
     cave = Cave(_parse_inputs(inputs), None, None, None, cost_so_far=0)
     caves = [cave]
-    lowest_cave = None
     hash_to_score = {}
+    lowest_cave = None
     lowest_score = None
     i = 0
     while caves:
         i+=1
 
         cave = caves.pop(0)
-        # cave_cost = cave.get_total_cost()
-
-        # if lowest_score is not None and cave_cost >= lowest_score:
-        #     # print(f"Skipped cave because cave cost {cave_cost} is bigger than lowest score {lowest_score}")
-        #     continue
-
-        # hash = cave.hash()
-        # hashed_score = hash_to_score.get(hash)
-        # if hashed_score is None or cave_cost < hashed_score:
-        #     hash_to_score[hash] = cave_cost
-        # else:
-        #     continue
 
         next_caves = cave.get_next_caves()
         for next_cave in next_caves:
             hash = next_cave.hash()
             current_cost = next_cave.get_total_cost()
-            # if lowest_score is not None and current_cost >= lowest_score:
-            #     print(f"Skipped cave because current cost {current_cost} is bigger than lowest score {lowest_score}")
-            #     continue
             if next_cave.is_organized():
-                # import pdb; pdb.set_trace()
-                # print(f'cave finished with score {next_cave.get_total_cost()}')
                 if lowest_score is None or current_cost < lowest_score:
                     lowest_score = current_cost
                     lowest_cave = next_cave
-                    # print(f'before {len(caves)}')
-                    # caves = [c for c in caves if c.get_total_cost() < lowest_score]
-                    # print(f'after {len(caves)}')
                 continue
-                # finished.append(next_cave)
+
             if hashed_score := hash_to_score.get(hash):
                 if current_cost >= hashed_score:
                     continue
@@ -70,16 +50,13 @@ def run_1(inputs):
                     hash_to_score[hash] = current_cost
             else:
                 hash_to_score[hash] = current_cost
-            # print(current_cost)
 
             caves.append(next_cave)
 
         if i % 100000 == 0:
-            # cave.print_game()
-            # cave.print()
             print(i, len(caves), lowest_score)
-    # import pdb; pdb.set_trace()
-    # lowest_cave.to_file()
+
+    # lowest_cave.print_game()
     print(f'final {lowest_score}')
     return lowest_score
 
@@ -152,7 +129,7 @@ class Cave:
         that are a valid move and return along with cost.
         :return: dict[original position] -> list[(next position, type, cost of move)]
         """
-        amphipods = [tup for tup in self.grid.items() if tup[1] in self.AMPHIPOD_TO_MOVE_COST.keys()]
+        amphipods = [tup for tup in self.grid.items() if tup[1] in self.AMPHIPODS]
         result = {}
 
         for position, amphipod_type in amphipods:
@@ -162,18 +139,9 @@ class Cave:
         return result
 
     def get_total_cost(self):
-        # cost = 0
-        # current = self
-        # while current.cost_last_move is not None:
-        #     cost += current.cost_last_move
-        #     current = current.previous_cave
-        # if current.cost_last_move:
-        #     cost += current.cost_last_move
-        # assert self.cost_so_far == cost
         return self.cost_so_far
 
     def _get_valid_nexts_for_amphipod(self, position, amphipod_type):
-        # if amphipod_type == 'D': import pdb; pdb.set_trace()
         if position in self.ROOM_COORDS:
             if position in self.AMPHIPOD_TO_ROOM_COORDS[amphipod_type] and not self._room_occupied_by_stranger(amphipod_type):
                 return []
@@ -198,20 +166,16 @@ class Cave:
                 adjacents = to_room
 
         for next_position in adjacents:
-            # if self.last_move: import pdb; pdb.set_trace()
-            if self.last_move and self.last_move[0] == next_position:
+            if self.last_move and self.last_move[2] == amphipod_type and self.last_move[0] == next_position:
                 # Never go backwards
                 continue
             if valid_next := self._get_valid_next_position(next_position, amphipod_type, position):
                 resulting_position, cost = valid_next
                 valid_nexts.append((resulting_position, amphipod_type, cost))
-        # if self.grid[(9,1)] == 'D' and self.grid[(1,1)] == 'D' and amphipod_type == 'D':
-        #     import pdb; pdb.set_trace()
 
         return valid_nexts
 
     def _get_valid_next_position(self, next_position, amphipod_type, current_position):
-        # TODO may need to make this return list of all possible resulting positions from next_position
         char_at_next = self.grid.get(next_position, '-1')
         if char_at_next != '.':
             return None
@@ -234,9 +198,6 @@ class Cave:
         elif next_position[1] == 1:
             # In hallway
             if self._amphipod_is_stopped(amphipod_type, current_position):
-                # # I just came out of another persons room so allow move
-                # if self.last_move[0][1] in {2,3}:
-                #     return (next_position, self.AMPHIPOD_TO_MOVE_COST[amphipod_type])
                 # I am stopped, I will only move if there is a clear path to my destination
                 if result := self._path_to_desination(next_position, amphipod_type):
                     return result
@@ -246,24 +207,12 @@ class Cave:
                 return (next_position, self.AMPHIPOD_TO_MOVE_COST[amphipod_type])
 
         raise Exception(next_position)
-        # return (next_position, self.AMPHIPOD_TO_MOVE_COST[amphipod_type])
 
     def _amphipod_is_stopped(self, amphipod_type, current_position):
         """
         amphipod is stopped if the last move was made by another amphipod
         """
-        # import pdb; pdb.set_trace()
         return self.last_move[2] != amphipod_type or self.last_move[1] != current_position
-
-    # def _path_to_desination_unblocked(self, next_position, amphipod_type):
-    #     my_room_x = list(self.AMPHIPOD_TO_ROOM_COORDS[amphipod_type])[0][0]
-    #     all_x_between = list(range(next_position[0], my_room_x + 1)) if my_room_x >= next_position[0] else list(range(my_room_x, next_position[0] + 1))
-    #     if not all(self.grid[(x, 1)] == '.' for x in all_x_between):
-    #         return False
-    #     elif self._room_occupied_by_stranger(amphipod_type):
-    #         return False
-    #     else:
-    #         return True
 
     def _path_to_desination(self, next_position, amphipod_type):
         my_room_x = list(self.AMPHIPOD_TO_ROOM_COORDS[amphipod_type])[0][0]
@@ -297,25 +246,14 @@ class Cave:
             caves.append(current)
             current = current.previous_cave
         caves.append(current)
-        for i, cave in enumerate(reversed(caves)):
-            _print_cave(cave.grid, i=i)
-
-    def to_file(self):
-        current = self
-        caves = []
-        while current.previous_cave is not None:
-            caves.append(current)
-            current = current.previous_cave
-        caves.append(current)
-        with open('/tmp/aoc_24_debug.txt', 'w') as f:
-            f.write('last_move  last_score  current_score')
-            for i, cave in enumerate(reversed(caves)):
-                # cave.print(file=f)
-                f.write(f'{cave.last_move} {cave.cost_last_move} {cave.cost_so_far}')
-                f.write('\n')
+        for cave in reversed(caves):
+            import time
+            time.sleep(1)
+            print(f"cost_so_far={cave.cost_so_far} cost_last_move={cave.cost_last_move}")
+            _print_cave(cave.grid)
+            print()
 
     def hash(self):
-        # return ''.join(str(k) + str(v) for k,v in self.grid.items() if v in self.AMPHIPODS) + str(self.last_move)
         return ''.join(str(k) + str(v) for k,v in self.grid.items())
 
 
@@ -342,10 +280,6 @@ def _print_cave(grid, i=0, file=None):
         print(buffer, end='', file=file)
         for x in range(max_x + 1):
             val = grid.get((x,y), ' ')
-            # if val == 0:
-            #     print('\033[1;31m' + str(val), end=' ')
-            # else:
-            #     print("\033[0;0m" + str(val), end=' ')
             print(str(val), end='', file=file)
         print()
 
@@ -390,17 +324,6 @@ def run_tests():
     if (result := cave._get_valid_nexts_for_amphipod((7,3), 'C')) != []:
         raise Exception(result)
 
-#     test_inputs = """
-# #############
-# #.B....BC...#
-# ###A#.#.#D###
-#   #A#C#.#D#
-#   #########
-#     """.strip().split('\n')
-#     cave = Cave(_parse_inputs(test_inputs), None, None, None)
-#     if (result := cave._get_valid_nexts_for_amphipod((5,3), 'C')) != [((6,1), 'C', 300)]:
-#         raise Exception(result)
-
     test_inputs = """
 #############
 #.B....BC...#
@@ -412,9 +335,6 @@ def run_tests():
     if (result := cave._get_valid_nexts_for_amphipod((5,3), 'C')) != [((5,1), 'C', 200)]:
         raise Exception(result)
 
-    # # False because C is in the room
-    # if (result := cave._path_to_desination_unblocked((4,1), 'B')) != False:
-    #     raise Exception(result)
     # False because C is in the room
     if (result := cave._path_to_desination((4,1), 'B')) != None:
         raise Exception(result)
@@ -431,8 +351,6 @@ def run_tests():
     if (result := cave._get_valid_nexts_for_amphipod((7,1), 'B')) != []:
         raise Exception(result)
 
-    # if (result := cave._path_to_desination_unblocked((5,1), 'C')) != False:
-    #     raise Exception(result)
     if (result := cave._path_to_desination((5,1), 'C')) != None:
         raise Exception(result)
 
@@ -505,7 +423,6 @@ if __name__ == "__main__":
 
     input = read_inputs(23)
 
-    # 16312 too high
     result_1 = run_1(input)
     print(f"Finished 1 with result {result_1}")
 
