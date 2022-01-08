@@ -38,15 +38,27 @@ def _run(cave):
     hash_to_score = {}
     lowest_cave = None
     lowest_score = None
+    # stuck_caves = set()
     i = 0
     while caves:
         i+=1
 
         cave = caves.pop(0)
-
         next_caves = cave.get_next_caves()
+        # import pdb; pdb.set_trace()
+        # if cave.grid[(3,5)] == 'A' and cave.grid[(3,4)] == 'A' and cave.grid[(5,4)] == 'B' and cave.grid[(5,5)] == 'B':
+        #     import pdb; pdb.set_trace()
+        # if not next_caves:
+        #     this_hash = cave.hash()
+        #     stuck_caves.add(this_hash)
+
         for next_cave in next_caves:
             hash = next_cave.hash()
+
+            # if hash in stuck_caves:
+            #     print("stuck cave, skipping ")
+            #     continue
+
             current_cost = next_cave.get_total_cost()
             if next_cave.is_organized():
                 if lowest_score is None or current_cost < lowest_score:
@@ -67,7 +79,7 @@ def _run(cave):
         if i % 100000 == 0:
             print(i, len(caves), lowest_score)
 
-    # lowest_cave.print_game()
+    lowest_cave.print_game()
     print(f'final {lowest_score}')
     return lowest_score
 
@@ -164,8 +176,11 @@ class Cave(ABC):
     def _hallway_above_me_is_not_occupied(self, my_x):
         return self.grid[(my_x, 1)] == '.'
 
-    def _is_backwards_move(self, amphipod_type, next_position):
-        return self.last_move and self.last_move[2] == amphipod_type and self.last_move[0] == next_position
+    def _is_backwards_move(self, amphipod_type, current_position, next_position):
+        return self.last_move and \
+            self.last_move[2] == amphipod_type and \
+            self.last_move[0] == next_position and \
+            self.last_move[1] == current_position
 
     def _get_valid_nexts_for_amphipod(self, position, amphipod_type):
         if position in self.get_room_coords():
@@ -194,7 +209,7 @@ class Cave(ABC):
                     adjacents = to_room
 
             for next_position in adjacents:
-                if self._is_backwards_move(amphipod_type, next_position):
+                if self._is_backwards_move(amphipod_type, position, next_position):
                     # Never go backwards
                     continue
                 if valid_next := self._get_valid_next_position(next_position, amphipod_type, position):
@@ -352,7 +367,9 @@ class Cave2(Cave):
                  cost_last_move,
                  cost_so_far=0):
         Cave.__init__(self, grid, previous_cave, last_move, cost_last_move, cost_so_far=cost_so_far)
-        self._insert_lines_to_grid()
+        if previous_cave is None:
+            print("Inserting lines to grid for part 2")
+            self._insert_lines_to_grid()
 
     def _insert_lines_to_grid(self):
         """
@@ -444,6 +461,20 @@ def run_tests():
     test_inputs = """
 #############
 #...........#
+###A#B#C#D###
+  #A#B#C#D#
+  #A#B#C#D#
+  #A#B#C#D#
+  #########
+    """.strip().split('\n')
+
+    cave = Cave2(_parse_inputs(test_inputs), -1, None, None)
+    if (result := cave.is_organized()) != True:
+        raise Exception(result)
+
+    test_inputs = """
+#############
+#...........#
 ###B#C#B#D###
   #A#D#C#A#
   #########
@@ -523,6 +554,20 @@ def run_tests():
         raise Exception(result)
 
     test_inputs = """
+#############
+#AAD......AA#
+###.#B#C#.###
+  #.#B#C#.#
+  #.#B#C#D#
+  #D#B#C#D#
+  #########
+  """.strip().split('\n')
+    # D should go to its home
+    cave = Cave2(_parse_inputs(test_inputs), -1, ((4, 1), (9, 4), 'D'), None)
+    if (result := cave._get_valid_nexts_for_amphipod((3,1), 'D')) != [((9, 3), 'D', 8000)]:
+        raise Exception(result)
+
+    test_inputs = """
     #############
     #D.......D..#
     ###.#B#C#.###
@@ -541,9 +586,9 @@ def run_tests():
   #########
     """.strip().split('\n')
 
-    # result_1 = run_1(test_inputs)
-    # if result_1 != 12521:
-    #     raise Exception(f"Test 1 did not pass, got {result_1}")
+    result_1 = run_1(test_inputs)
+    if result_1 != 12521:
+        raise Exception(f"Test 1 did not pass, got {result_1}")
 
     result_2 = run_2(test_inputs)
     if result_2 != 44169:
@@ -555,8 +600,11 @@ if __name__ == "__main__":
 
     input = read_inputs(23)
 
-    result_1 = run_1(input)
-    print(f"Finished 1 with result {result_1}")
+    # result_1 = run_1(input)
+    # print(f"Finished 1 with result {result_1}")
 
+    # import pdb; pdb.set_trace()
+    # 56256 too high
+    # 52696 too high
     result_2 = run_2(input)
     print(f"Finished 2 with result {result_2}")
