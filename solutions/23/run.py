@@ -38,29 +38,20 @@ def _run(cave):
     hash_to_score = {}
     lowest_cave = None
     lowest_score = None
-    # stuck_caves = set()
+    finished_caves = []
     i = 0
     while caves:
         i+=1
 
         cave = caves.pop(0)
         next_caves = cave.get_next_caves()
-        # import pdb; pdb.set_trace()
-        # if cave.grid[(3,5)] == 'A' and cave.grid[(3,4)] == 'A' and cave.grid[(5,4)] == 'B' and cave.grid[(5,5)] == 'B':
-        #     import pdb; pdb.set_trace()
-        # if not next_caves:
-        #     this_hash = cave.hash()
-        #     stuck_caves.add(this_hash)
 
         for next_cave in next_caves:
             hash = next_cave.hash()
 
-            # if hash in stuck_caves:
-            #     print("stuck cave, skipping ")
-            #     continue
-
             current_cost = next_cave.get_total_cost()
             if next_cave.is_organized():
+                finished_caves.append(next_cave)
                 if lowest_score is None or current_cost < lowest_score:
                     lowest_score = current_cost
                     lowest_cave = next_cave
@@ -79,6 +70,7 @@ def _run(cave):
         if i % 100000 == 0:
             print(i, len(caves), lowest_score)
 
+    # import pdb; pdb.set_trace()
     lowest_cave.print_game()
     print(f'final {lowest_score}')
     return lowest_score
@@ -311,7 +303,7 @@ class Cave(ABC):
             print()
 
     def hash(self):
-        return ''.join(str(k) + str(v) for k,v in self.grid.items())
+        return ''.join(str(k) + str(v) for k,v in self.grid.items()) + str(self.last_move)
 
 
 class Cave1(Cave):
@@ -596,7 +588,7 @@ def run_tests():
 
 
 if __name__ == "__main__":
-    run_tests()
+    # run_tests()
 
     input = read_inputs(23)
 
@@ -606,5 +598,6 @@ if __name__ == "__main__":
     # import pdb; pdb.set_trace()
     # 56256 too high
     # 52696 too high
+    # 48476 too low
     result_2 = run_2(input)
     print(f"Finished 2 with result {result_2}")
