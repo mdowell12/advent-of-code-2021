@@ -70,7 +70,6 @@ def _run(cave):
         if i % 100000 == 0:
             print(i, len(caves), lowest_score)
 
-    # import pdb; pdb.set_trace()
     lowest_cave.print_game()
     print(f'final {lowest_score}')
     return lowest_score
@@ -144,8 +143,13 @@ class Cave(ABC):
         :return: dict[original position] -> list[(next position, type, cost of move)]
         """
         amphipods = [tup for tup in self.grid.items() if tup[1] in self.AMPHIPODS]
-        result = {}
 
+        # If any amphipods are stopped outside of a room, this is an invalid game
+        # so return empty result to terminate it
+        if self._amphipod_is_stopped_outside_of_room(amphipods):
+            return {}
+
+        result = {}
         for position, amphipod_type in amphipods:
             valid_nexts = self._get_valid_nexts_for_amphipod(position, amphipod_type)
             if valid_nexts:
@@ -155,6 +159,13 @@ class Cave(ABC):
     def get_total_cost(self):
         return self.cost_so_far
 
+    def _amphipod_is_stopped_outside_of_room(self, amphipods):
+        stopped_amphipods = [a for a in amphipods if self._amphipod_is_stopped(a[1], a[0])]
+        return any(self._amphipod_is_outside_of_a_room(a[0]) for a in stopped_amphipods)
+
+    def _amphipod_is_outside_of_a_room(self, position):
+        return position[1] == 1 and position[0] in {3, 5, 7, 9}
+
     def _room_occupied_by_stranger(self, amphipod_type):
         my_room_coords = self.get_amphipod_to_room_coords()[amphipod_type]
         return not all(self.grid[c] in {amphipod_type, '.'} for c in my_room_coords)
@@ -163,6 +174,8 @@ class Cave(ABC):
         """
         amphipod is stopped if the last move was made by another amphipod
         """
+        if self.last_move is None:
+            return False
         return self.last_move[2] != amphipod_type or self.last_move[1] != current_position
 
     def _hallway_above_me_is_not_occupied(self, my_x):
@@ -588,16 +601,12 @@ def run_tests():
 
 
 if __name__ == "__main__":
-    # run_tests()
+    run_tests()
 
     input = read_inputs(23)
 
-    # result_1 = run_1(input)
-    # print(f"Finished 1 with result {result_1}")
+    result_1 = run_1(input)
+    print(f"Finished 1 with result {result_1}")
 
-    # import pdb; pdb.set_trace()
-    # 56256 too high
-    # 52696 too high
-    # 48476 too low
     result_2 = run_2(input)
     print(f"Finished 2 with result {result_2}")
