@@ -1,45 +1,8 @@
-import random
-
 from solutions.get_inputs import read_inputs
 
 
-# DEBUG = True
 DEBUG = False
 
-
-def run_1(inputs):
-    program = Program(inputs)
-
-    # input = [5] * 14
-    input = list('13579246899999')
-    result = program.run(input)
-    print(result['z'])
-
-    # for i in range(1,10):
-    #     for j in range(1,10):
-    #         for k in range(1,10):
-    #             for l in range(1,10):
-    #                 for m in range(1,10):
-    #                     arg = list('1357924689') + [i,j,k,l,m]
-    #                     result = program.run(arg)
-    #                     print(arg, result['z'])
-    #                     if result == 0:
-    #                         import pdb; pdb.set_trace()
-
-    for m in range(100000000):
-        arg = _gen_random()
-        result = program.run(arg)
-        print(arg, result['z'])
-        if result == 0:
-            import pdb; pdb.set_trace()
-
-
-def run_2(inputs):
-    pass
-
-
-def _gen_random():
-    return [random.randint(1,9) for _ in range(14)]
 
 class Program:
 
@@ -58,6 +21,7 @@ class Program:
         state = {i: 0 for i in ['x', 'y', 'z', 'w']}
         for command, values in self.instructions:
             if command == 'inp':
+                print(state)
                 self._do_inp(inputs, state, values)
                 if DEBUG: print(f'command: {command} values: {values} state: {state} inputs: {inputs}')
             elif command == 'mul':
@@ -77,7 +41,7 @@ class Program:
                 if DEBUG: print(f'command: {command} values: {values} state: {state} inputs: {inputs}')
             else:
                 raise Exception(command)
-        print()
+
         return state
 
     def _do_inp(self, inputs, state, command_values):
@@ -94,8 +58,6 @@ class Program:
 
     def _do_add(self, state, command_values):
         left, left_value, right, right_value = self._parse_command_values(state, command_values)
-        if not (isinstance(left_value, int) and isinstance(right_value, int)):
-            import pdb; pdb.set_trace()
         result = left_value + right_value
 
         state[left] = result
@@ -107,13 +69,13 @@ class Program:
 
     def _do_mod(self, state, command_values):
         left, left_value, right, right_value = self._parse_command_values(state, command_values)
-        result = left_value %    right_value
+        result = left_value % right_value
         state[left] = result
 
     def _do_eql(self, state, command_values):
         left, left_value, right, right_value = self._parse_command_values(state, command_values)
         result = left_value == right_value
-        state[left] = result
+        state[left] = 1 if result else 0
 
     def _parse_command_values(self, state, command_values):
         assert len(command_values) == 2
@@ -177,18 +139,19 @@ def run_tests():
     if Program(test_inputs).run([3]) != {'x': 0, 'y': 1, 'z': 1, 'w': 0}:
         raise Exception()
 
-    # result_2 = run_2(test_inputs)
-    # if result_2 != 0:
-    #     raise Exception(f"Test 2 did not pass, got {result_2}")
-
 
 if __name__ == "__main__":
     run_tests()
 
-    input = read_inputs(24)
+    input_data = read_inputs(24)
 
-    result_1 = run_1(input)
-    print(f"Finished 1 with result {result_1}")
+    program = Program(input_data)
+    # Part 1 - this answer was achieved manually in ipython
+    result = program.run(list('74929995999389'))
+    if result['z'] == 0:
+        print('Part 1 passed')
 
-    # result_2 = run_2(input)
-    # print(f"Finished 2 with result {result_2}")
+    # Part 2 - this answer was achieved manually in ipython
+    result = program.run(list('11118151637112'))
+    if result['z'] == 0:
+        print('Part 2 passed')
